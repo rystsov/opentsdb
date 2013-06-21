@@ -37,9 +37,9 @@ import net.opentsdb.uid.NoSuchUniqueName;
 /**
  * Non-synchronized implementation of {@link Query}.
  */
-final class TsdbQuery implements Query {
+final class _TsdbQuery implements Query {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TsdbQuery.class);
+  private static final Logger LOG = LoggerFactory.getLogger(_TsdbQuery.class);
 
   /** Used whenever there are no results. */
   private static final DataPoints[] NO_RESULT = new DataPoints[0];
@@ -112,7 +112,7 @@ final class TsdbQuery implements Query {
   private int sample_interval;
 
   /** Constructor. */
-  public TsdbQuery(final TSDB tsdb) {
+  public _TsdbQuery(final TSDB tsdb) {
     this.tsdb = tsdb;
   }
 
@@ -158,6 +158,7 @@ final class TsdbQuery implements Query {
                             final boolean rate) throws NoSuchUniqueName {
     findGroupBys(tags);
     this.metric = tsdb.metrics.getId(metric);
+    // joins tag+value
     this.tags = Tags.resolveAll(tsdb, tags);
     aggregator = function;
     this.rate = rate;

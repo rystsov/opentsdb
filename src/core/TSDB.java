@@ -146,7 +146,7 @@ public final class TSDB {
 
     collector.addExtraTag("class", "TsdbQuery");
     try {
-      collector.record("hbase.latency", TsdbQuery.scanlatency, "method=scan");
+      collector.record("hbase.latency", _TsdbQuery.scanlatency, "method=scan");
     } finally {
       collector.clearExtraTag("class");
     }
@@ -181,7 +181,7 @@ public final class TSDB {
 
   /** Returns a latency histogram for Scan RPCs used to fetch data points.  */
   public Histogram getScanLatencyHistogram() {
-    return TsdbQuery.scanlatency;
+    return _TsdbQuery.scanlatency;
   }
 
   /**
@@ -199,8 +199,8 @@ public final class TSDB {
   /**
    * Returns a new {@link Query} instance suitable for this TSDB.
    */
-  public Query newQuery() {
-    return new TsdbQuery(this);
+  public TsdbQueryDtoBuilder newQuery() {
+    return new TsdbQueryDtoBuilder(this);
   }
 
   /**

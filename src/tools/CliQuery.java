@@ -23,6 +23,9 @@ import org.slf4j.LoggerFactory;
 
 import org.hbase.async.HBaseClient;
 
+import net.opentsdb.core.TsdbQueryDtoBuilder;
+import net.opentsdb.core.TsdbQueryDto;
+import net.opentsdb.core.TsdbQueryAggregator;
 import net.opentsdb.core.Aggregator;
 import net.opentsdb.core.Aggregators;
 import net.opentsdb.core.Query;
@@ -135,15 +138,15 @@ final class CliQuery {
                               final String args[],
                               final boolean want_plot) {
     final ArrayList<String> plotparams = new ArrayList<String>();
-    final ArrayList<Query> queries = new ArrayList<Query>();
+    final ArrayList<TsdbQueryDto> queries = new ArrayList<TsdbQueryDto>();
     final ArrayList<String> plotoptions = new ArrayList<String>();
     parseCommandLineQuery(args, tsdb, queries, plotparams, plotoptions);
     if (queries.isEmpty()) {
       usage(null, "Not enough arguments, need at least one query.", 2);
     }
 
-    final Plot plot = (want_plot ? new Plot(queries.get(0).getStartTime(),
-                                            queries.get(0).getEndTime())
+    final Plot plot = (want_plot ? new Plot(queries.get(0).start_time,
+                                            queries.get(0).end_time)
                        : null);
     if (want_plot) {
       plot.setParams(parsePlotParams(plotparams));
@@ -152,7 +155,7 @@ final class CliQuery {
     for (int i = 0; i < nqueries; i++) {
       // TODO(tsuna): Optimization: run each query in parallel.
       final StringBuilder buf = want_plot ? null : new StringBuilder();
-      for (final DataPoints datapoints : queries.get(i).run()) {
+      for (final DataPoints datapoints : TsdbQueryAggregator.execute(tsdb, queries.get(i))) {
         if (want_plot) {
           plot.add(datapoints, plotoptions.get(i));
         } else {
@@ -190,16 +193,15 @@ final class CliQuery {
    */
   static void parseCommandLineQuery(final String[] args,
                                     final TSDB tsdb,
-                                    final ArrayList<Query> queries,
+                                    final ArrayList<TsdbQueryDto> queries,
                                     final ArrayList<String> plotparams,
                                     final ArrayList<String> plotoptions) {
     final long start_ts = parseDate(args[0]);
-    final long end_ts = (args.length > 3
+    long end_ts = (args.length > 3
                          && (args[1].charAt(0) != '+'
                              && (args[1].indexOf(':') >= 0
                                  || args[1].indexOf('/') >= 0))
                          ? parseDate(args[1]) : -1);
-
     int i = end_ts < 0 ? 1 : 2;
     while (i < args.length && args[i].charAt(0) == '+') {
       if (plotparams != null) {
@@ -207,6 +209,8 @@ final class CliQuery {
       }
       i++;
     }
+
+    if (end_ts==-1) end_ts = System.currentTimeMillis() / 1000;
 
     while (i < args.length) {
       final Aggregator agg = Aggregators.get(args[i++]);
@@ -229,16 +233,19 @@ final class CliQuery {
       if (i < args.length && args[i].indexOf(' ', 1) > 0) {
         plotoptions.add(args[i++]);
       }
-      final Query query = tsdb.newQuery();
+      final TsdbQueryDtoBuilder query = tsdb.newQuery();
       query.setStartTime(start_ts);
       if (end_ts > 0) {
         query.setEndTime(end_ts);
       }
-      query.setTimeSeries(metric, tags, agg, rate);
+      query.setMetric(metric);
+      query.setAggregator(agg);
+      query.setRate(rate);
+      query.setTags(tags);
       if (downsample) {
-        query.downsample(interval, sampler);
+        query.setDownsample(interval, sampler);
       }
-      queries.add(query);
+      queries.add(query.build());
     }
   }
 

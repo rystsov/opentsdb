@@ -72,11 +72,6 @@ public final class Internal {
     // Can't instantiate.
   }
 
-  /** @see TsdbQuery#getScanner */
-  public static Scanner getScanner(final Query query) {
-    return ((TsdbQuery) query).getScanner();
-  }
-
   /** @see RowKey#metricName */
   public static String metricName(final TSDB tsdb, final byte[] id) {
     return RowKey.metricName(tsdb, id);

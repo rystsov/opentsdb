@@ -46,6 +46,9 @@ import net.opentsdb.core.DataPoints;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
 import net.opentsdb.core.Tags;
+import net.opentsdb.core.TsdbQueryDtoBuilder;
+import net.opentsdb.core.TsdbQueryDto;
+import net.opentsdb.core.TsdbQueryAggregator;
 import net.opentsdb.graph.Plot;
 import net.opentsdb.stats.Histogram;
 import net.opentsdb.stats.StatsCollector;
@@ -127,6 +130,7 @@ final class GraphHandler implements HttpRpc {
 
   private void doGraph(final TSDB tsdb, final HttpQuery query)
     throws IOException {
+    // cachedir + hash(query)
     final String basepath = getGnuplotBasePath(query);
     final long start_time = getQueryStringDate(query, "start");
     final boolean nocache = query.hasQueryStringParam("nocache");
@@ -139,13 +143,14 @@ final class GraphHandler implements HttpRpc {
       end_time = now;
     }
     final int max_age = computeMaxAge(query, start_time, end_time, now);
+    // if there is a cache hit nothing will be returned?!
     if (!nocache && isDiskCacheHit(query, end_time, max_age, basepath)) {
       return;
     }
-    Query[] tsdbqueries;
-    List<String> options;
-    tsdbqueries = parseQuery(tsdb, query);
-    options = query.getQueryStringParams("o");
+
+    TsdbQueryDto[] tsdbqueries = parseQuery(tsdb, query, start_time, end_time);
+    // if we do right level before this part may be ignored
+    List<String> options = query.getQueryStringParams("o");
     if (options == null) {
       options = new ArrayList<String>(tsdbqueries.length);
       for (int i = 0; i < tsdbqueries.length; i++) {
@@ -155,18 +160,6 @@ final class GraphHandler implements HttpRpc {
       throw new BadRequestException(options.size() + " `o' parameters, but "
         + tsdbqueries.length + " `m' parameters.");
     }
-    for (final Query tsdbquery : tsdbqueries) {
-      try {
-        tsdbquery.setStartTime(start_time);
-      } catch (IllegalArgumentException e) {
-        throw new BadRequestException("start time: " + e.getMessage());
-      }
-      try {
-        tsdbquery.setEndTime(end_time);
-      } catch (IllegalArgumentException e) {
-        throw new BadRequestException("end time: " + e.getMessage());
-      }
-    }
     final Plot plot = new Plot(start_time, end_time,
                                timezones.get(query.getQueryStringParam("tz")));
     setPlotDimensions(query, plot);
@@ -175,11 +168,13 @@ final class GraphHandler implements HttpRpc {
     @SuppressWarnings("unchecked")
     final HashSet<String>[] aggregated_tags = new HashSet[nqueries];
     int npoints = 0;
+
     for (int i = 0; i < nqueries; i++) {
       try {  // execute the TSDB query!
         // XXX This is slow and will block Netty.  TODO(tsuna): Don't block.
         // TODO(tsuna): Optimization: run each query in parallel.
-        final DataPoints[] series = tsdbqueries[i].run();
+        // insert magic here
+        final DataPoints[] series = TsdbQueryAggregator.execute(tsdb, tsdbqueries[i]);
         for (final DataPoints datapoints : series) {
           plot.add(datapoints, options.get(i));
           aggregated_tags[i] = new HashSet<String>();
@@ -825,12 +820,12 @@ final class GraphHandler implements HttpRpc {
    * @throws BadRequestException if the query was malformed.
    * @throws IllegalArgumentException if the metric or tags were malformed.
    */
-  private static Query[] parseQuery(final TSDB tsdb, final HttpQuery query) {
+  private static TsdbQueryDto[] parseQuery(final TSDB tsdb, final HttpQuery query, long start_time, long end_time) {
     final List<String> ms = query.getQueryStringParams("m");
     if (ms == null) {
       throw BadRequestException.missingParameter("m");
     }
-    final Query[] tsdbqueries = new Query[ms.size()];
+    final TsdbQueryDto[] tsdbqueries = new TsdbQueryDto[ms.size()];
     int nqueries = 0;
     for (final String m : ms) {
       // m is of the following forms:
@@ -850,12 +845,22 @@ final class GraphHandler implements HttpRpc {
       if (rate) {
         i--;  // Move to the next part.
       }
-      final Query tsdbquery = tsdb.newQuery();
+
+        final TsdbQueryDtoBuilder tsdbquery = tsdb.newQuery();
       try {
-        tsdbquery.setTimeSeries(metric, parsedtags, agg, rate);
+          tsdbquery.setMetric(metric);
+          tsdbquery.setAggregator(agg);
+          tsdbquery.setRate(rate);
+          tsdbquery.setTags(parsedtags);
       } catch (NoSuchUniqueName e) {
         throw new BadRequestException(e.getMessage());
       }
+        try {
+            tsdbquery.setStartTime(start_time);
+            tsdbquery.setEndTime(end_time);
+          } catch (IllegalArgumentException e) {
+            throw new BadRequestException("start or end time: " + e.getMessage());
+          }
       // downsampling function & interval.
       if (i > 0) {
         final int dash = parts[1].indexOf('-', 1);  // 1st char can't be `-'.
@@ -871,9 +876,9 @@ final class GraphHandler implements HttpRpc {
                                         + parts[1].substring(dash + 1));
         }
         final int interval = parseDuration(parts[1].substring(0, dash));
-        tsdbquery.downsample(interval, downsampler);
+        tsdbquery.setDownsample(interval, downsampler);
       }
-      tsdbqueries[nqueries++] = tsdbquery;
+      tsdbqueries[nqueries++] = tsdbquery.build();
     }
     return tsdbqueries;
   }

@@ -32,6 +32,10 @@ import net.opentsdb.core.IllegalDataException;
 import net.opentsdb.core.Internal;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
+import net.opentsdb.core.TsdbQueryDtoBuilder;
+import net.opentsdb.core.TsdbQueryDto;
+import net.opentsdb.core.TsdbQueryAggregator;
+import net.opentsdb.core.TsdbQueryLoader;
 
 /**
  * Tool to look for and fix corrupted data in a TSDB.
@@ -110,17 +114,17 @@ final class Fsck {
 
     final short metric_width = Internal.metricWidth(tsdb);
 
-    final ArrayList<Query> queries = new ArrayList<Query>();
+    final ArrayList<TsdbQueryDto> queries = new ArrayList<TsdbQueryDto>();
     CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null);
     final StringBuilder buf = new StringBuilder();
-    for (final Query query : queries) {
+    for (final TsdbQueryDto query : queries) {
       final long start_time = System.nanoTime();
       long ping_start_time = start_time;
       LOG.info("Starting to fsck data covered by " + query);
       long kvcount = 0;
       long rowcount = 0;
       final Bytes.ByteMap<Seen> seen = new Bytes.ByteMap<Seen>();
-      final Scanner scanner = Internal.getScanner(query);
+      final Scanner scanner = TsdbQueryLoader.getScanner(tsdb, query);
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
         for (final ArrayList<KeyValue> row : rows) {

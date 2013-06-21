@@ -27,6 +27,10 @@ import net.opentsdb.core.IllegalDataException;
 import net.opentsdb.core.Internal;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
+import net.opentsdb.core.TsdbQueryDtoBuilder;
+import net.opentsdb.core.TsdbQueryDto;
+import net.opentsdb.core.TsdbQueryAggregator;
+import net.opentsdb.core.TsdbQueryLoader;
 
 /**
  * Tool to dump the data straight from HBase.
@@ -85,12 +89,12 @@ final class DumpSeries {
                              final boolean delete,
                              final boolean importformat,
                              final String[] args) throws Exception {
-    final ArrayList<Query> queries = new ArrayList<Query>();
+    final ArrayList<TsdbQueryDto> queries = new ArrayList<TsdbQueryDto>();
     CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null);
 
     final StringBuilder buf = new StringBuilder();
-    for (final Query query : queries) {
-      final Scanner scanner = Internal.getScanner(query);
+    for (final TsdbQueryDto query : queries) {
+      final Scanner scanner = TsdbQueryLoader.getScanner(tsdb, query);
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
         for (final ArrayList<KeyValue> row : rows) {

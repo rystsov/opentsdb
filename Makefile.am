@@ -46,7 +46,7 @@ tsdb_SRC := \
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\
 	src/core/Tags.java	\
-	src/core/TsdbQuery.java	\
+	src/core/_TsdbQuery.java	\
 	src/core/WritableDataPoints.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
@@ -76,7 +76,12 @@ tsdb_SRC := \
 	src/uid/NoSuchUniqueId.java	\
 	src/uid/NoSuchUniqueName.java	\
 	src/uid/UniqueId.java	\
-	src/uid/UniqueIdInterface.java
+	src/uid/UniqueIdInterface.java  \
+	src/core/TsdbQueryDto.java	\
+	src/core/TsdbQueryDtoBuilder.java	\
+	src/core/TsdbQueryLoader.java	\
+	src/core/TsdbQueryAggregator.java \
+	src/core/TsdbQuerySplitter.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\
