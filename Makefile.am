@@ -81,7 +81,7 @@ tsdb_SRC := \
 	src/core/TsdbQueryDtoBuilder.java	\
 	src/core/TsdbQueryLoader.java	\
 	src/core/TsdbQueryAggregator.java \
-	src/core/TsdbQuerySplitter.java
+	src/core/FederatedMetricEngine.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\

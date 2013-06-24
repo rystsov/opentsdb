@@ -1,15 +1,12 @@
 package net.opentsdb.core;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author rystsov
  * @date 6/21/13
  */
-public class TsdbQuerySplitter {
+public class FederatedMetricEngine {
     static class FederatedMetric {
         public String metric;
 
@@ -26,8 +23,12 @@ public class TsdbQuerySplitter {
             tags = new HashMap<String, String>();
         }
 
+        public boolean isHead() {
+            return tags.isEmpty();
+        }
+
         public boolean isMatch(TsdbQueryDto query) {
-            if (tags.isEmpty()) return false;
+            if (isHead()) return false;
             for(String key : tags.keySet()) {
                 if (!query.tagsText.containsKey(key)) return false;
                 if (!query.tagsText.get(key).equals(tags.get(key))) return false;
@@ -37,8 +38,10 @@ public class TsdbQuerySplitter {
     }
 
     private final TSDB tsdb;
+    private Map<String, FederatedMetric> federated;
+    private HashSet<String> subMetricsIndex;
 
-    public TsdbQuerySplitter(TSDB tsdb) {
+    public FederatedMetricEngine(TSDB tsdb) {
         this.tsdb = tsdb;
         this.federated = new HashMap<String, FederatedMetric>();
 
@@ -54,17 +57,16 @@ public class TsdbQuerySplitter {
         clusterB.tags.put("cluster", "b");
         clusterB.name = "stuff/cluster/b";
 
-        SubMetric rest = new SubMetric();
-        rest.name = "stuff";
+        SubMetric head = new SubMetric();
+        head.name = "stuff";
 
         stuff.subMetrics.add(clusterA);
         stuff.subMetrics.add(clusterB);
-        stuff.subMetrics.add(rest);
+        stuff.subMetrics.add(head);
 
         federated.put(stuff.metric, stuff);
+        initSubMetricIndex();
     }
-
-    Map<String, FederatedMetric> federated;
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
@@ -90,6 +92,10 @@ public class TsdbQuerySplitter {
         return  result;
     }
 
+    public boolean isSubMetric(String name) {
+        return subMetricsIndex.contains(name);
+    }
+
     TsdbQueryDto specialise(TsdbQueryDto queue, SubMetric metric) {
         TsdbQueryDto nova = new TsdbQueryDto();
         nova.metric = tsdb.metrics.getId(metric.name);
@@ -105,5 +111,15 @@ public class TsdbQuerySplitter {
         nova.tags = queue.tags;
         nova.tagsText = queue.tagsText;
         return nova;
+    }
+
+    void initSubMetricIndex() {
+        subMetricsIndex = new HashSet<String>();
+        for (FederatedMetric metric : federated.values()) {
+            for (SubMetric sub : metric.subMetrics) {
+                if (sub.isHead()) continue;
+                subMetricsIndex.add(sub.name);
+            }
+        }
     }
 }

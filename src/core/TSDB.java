@@ -81,6 +81,7 @@ public final class TSDB {
    * row keys and will read re-compact them.
    */
   private final CompactionQueue compactionq;
+  private final FederatedMetricEngine federatedMetrics;
 
   /**
    * Constructor.
@@ -102,6 +103,11 @@ public final class TSDB {
     tag_values = new UniqueId(client, uidtable, TAG_VALUE_QUAL,
                               TAG_VALUE_WIDTH);
     compactionq = new CompactionQueue(this);
+    federatedMetrics = new FederatedMetricEngine(this);
+  }
+
+  public List<TsdbQueryDto> splitIfFederated(TsdbQueryDto query) {
+    return federatedMetrics.split(query);
   }
 
   /** Number of cache hits during lookups involving UIDs. */
@@ -375,7 +381,12 @@ public final class TSDB {
    * @param search A prefix to search.
    */
   public List<String> suggestMetrics(final String search) {
-    return metrics.suggest(search);
+    List<String> withoutSubMetrics = new ArrayList<String>();
+    for (String metric : metrics.suggest(search)) {
+        if (federatedMetrics.isSubMetric(metric)) continue;
+        withoutSubMetrics.add(metric);
+    }
+    return withoutSubMetrics;
   }
 
   /**

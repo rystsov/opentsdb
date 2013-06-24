@@ -61,10 +61,7 @@ public final class TsdbQueryAggregator {
 
     private DataPoints[] run(TsdbQueryDto query) throws HBaseException {
         TsdbQueryLoader loader = new TsdbQueryLoader(tsdb);
-        TsdbQuerySplitter splitter = new TsdbQuerySplitter(tsdb);
-        List<TsdbQueryDto> splitted = splitter.split(query);
-        // TODO: remove
-        LOG.info("Splitted in " + splitted.size());
+        List<TsdbQueryDto> splitted = tsdb.splitIfFederated(query);
         for (TsdbQueryDto subQuery : splitted) {
             groupByAndAggregate(subQuery, loader.findSpans(subQuery));
         }
