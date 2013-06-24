@@ -110,6 +110,11 @@ public final class TSDB {
     return federatedMetrics.split(query);
   }
 
+  public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
+    return federatedMetrics.tryMapMetricToSubMetric(metric, tags);
+  }
+
+
   /** Number of cache hits during lookups involving UIDs. */
   public int uidCacheHits() {
     return (metrics.cacheHits() + tag_names.cacheHits()
@@ -284,7 +289,7 @@ public final class TSDB {
                             tags, flags);
   }
 
-  private Deferred<Object> addPointInternal(final String metric,
+  private Deferred<Object> addPointInternal(String metric,
                                             final long timestamp,
                                             final byte[] value,
                                             final Map<String, String> tags,
@@ -297,6 +302,7 @@ public final class TSDB {
           + " to metric=" + metric + ", tags=" + tags);
     }
 
+    metric = tryMapMetricToSubMetric(metric, tags);
     IncomingDataPoints.checkMetricAndTags(metric, tags);
     final byte[] row = IncomingDataPoints.rowKeyTemplate(this, metric, tags);
     final long base_time = (timestamp - (timestamp % Const.MAX_TIMESPAN));

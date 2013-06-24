@@ -1,5 +1,8 @@
 package net.opentsdb.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 
 /**
@@ -7,6 +10,8 @@ import java.util.*;
  * @date 6/21/13
  */
 public class FederatedMetricEngine {
+    private static final Logger LOG = LoggerFactory.getLogger(FederatedMetricEngine.class);
+
     static class FederatedMetric {
         public String metric;
 
@@ -27,11 +32,11 @@ public class FederatedMetricEngine {
             return tags.isEmpty();
         }
 
-        public boolean isMatch(TsdbQueryDto query) {
+        public boolean isMatch(final Map<String, String> tags) {
             if (isHead()) return false;
-            for(String key : tags.keySet()) {
-                if (!query.tagsText.containsKey(key)) return false;
-                if (!query.tagsText.get(key).equals(tags.get(key))) return false;
+            for(String key : this.tags.keySet()) {
+                if (!tags.containsKey(key)) return false;
+                if (!tags.get(key).equals(this.tags.get(key))) return false;
             }
             return true;
         }
@@ -69,17 +74,19 @@ public class FederatedMetricEngine {
     }
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
+        // TODO: adds split based on time, since query may overlap unindexed and indexed data
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
         if (federated.containsKey(query.metricText)) {
             FederatedMetric metric = federated.get(query.metricText);
             SubMetric subMetric = null;
             for (SubMetric item : metric.subMetrics) {
-                if (item.isMatch(query)) {
+                if (item.isMatch(query.tagsText)) {
                     subMetric = item;
                     break;
                 }
             }
             if (subMetric==null) {
+                // TODO: exclude a priori wrong sub-metrics
                 for (SubMetric item : metric.subMetrics) {
                     result.add(specialise(query, item));
                 }
@@ -89,11 +96,28 @@ public class FederatedMetricEngine {
         } else {
             result.add(query);
         }
+        LOG.info("Splitted into " + result.size() + ": " + result);
         return  result;
     }
 
     public boolean isSubMetric(String name) {
         return subMetricsIndex.contains(name);
+    }
+
+    public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
+        if (!federated.containsKey(metric)) return metric;
+        SubMetric subMetric = null;
+        for (SubMetric item : federated.get(metric).subMetrics) {
+            if (item.isMatch(tags)) {
+                subMetric = item;
+                break;
+            }
+        }
+        if (subMetric!=null) {
+            LOG.info("Remap " + metric + " to " + subMetric.name);
+            metric = subMetric.name;
+        }
+        return metric;
     }
 
     TsdbQueryDto specialise(TsdbQueryDto queue, SubMetric metric) {

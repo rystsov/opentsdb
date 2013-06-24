@@ -134,7 +134,8 @@ final class IncomingDataPoints implements WritableDataPoints {
     return row;
   }
 
-  public void setSeries(final String metric, final Map<String, String> tags) {
+  public void setSeries(String metric, final Map<String, String> tags) {
+    metric = tsdb.tryMapMetricToSubMetric(metric, tags);
     checkMetricAndTags(metric, tags);
     row = rowKeyTemplate(tsdb, metric, tags);
     size = 0;
