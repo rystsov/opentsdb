@@ -19,6 +19,7 @@ all-am: build-aux/fetchdep.sh
 THIRD_PARTY =
 
 include third_party/guava/include.mk
+include third_party/gson/include.mk
 include third_party/gwt/include.mk
 include third_party/hamcrest/include.mk
 include third_party/hbase/include.mk

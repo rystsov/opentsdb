@@ -11,75 +11,26 @@ import java.util.*;
  */
 public class FederatedMetricEngine {
     private static final Logger LOG = LoggerFactory.getLogger(FederatedMetricEngine.class);
-
-    static class FederatedMetric {
-        public String metric;
-
-        public List<SubMetric> subMetrics;
-
-
-    }
-
-    static class SubMetric {
-        public String name;
-        public Map<String, String> tags;
-
-        public SubMetric() {
-            tags = new HashMap<String, String>();
-        }
-
-        public boolean isHead() {
-            return tags.isEmpty();
-        }
-
-        public boolean isMatch(final Map<String, String> tags) {
-            if (isHead()) return false;
-            for(String key : this.tags.keySet()) {
-                if (!tags.containsKey(key)) return false;
-                if (!tags.get(key).equals(this.tags.get(key))) return false;
-            }
-            return true;
-        }
-    }
+    private static final long CACHE_TIMEOUT_MS = 10*60*1000;
 
     private final TSDB tsdb;
-    private Map<String, FederatedMetric> federated;
-    private HashSet<String> subMetricsIndex;
+
+    private volatile FederatedMetricIndex index;
 
     public FederatedMetricEngine(TSDB tsdb) {
         this.tsdb = tsdb;
-        this.federated = new HashMap<String, FederatedMetric>();
-
-        FederatedMetric stuff = new FederatedMetric();
-        stuff.metric = "stuff";
-        stuff.subMetrics = new ArrayList<SubMetric>();
-
-        SubMetric clusterA = new SubMetric();
-        clusterA.tags.put("cluster", "a");
-        clusterA.name = "stuff/cluster/a";
-
-        SubMetric clusterB = new SubMetric();
-        clusterB.tags.put("cluster", "b");
-        clusterB.name = "stuff/cluster/b";
-
-        SubMetric head = new SubMetric();
-        head.name = "stuff";
-
-        stuff.subMetrics.add(clusterA);
-        stuff.subMetrics.add(clusterB);
-        stuff.subMetrics.add(head);
-
-        federated.put(stuff.metric, stuff);
-        initSubMetricIndex();
+        this.index = FederatedMetricIndex.load(tsdb);
     }
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
+        FederatedMetricIndex local = this.index;
+
         // TODO: adds split based on time, since query may overlap unindexed and indexed data
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
-        if (federated.containsKey(query.metricText)) {
-            FederatedMetric metric = federated.get(query.metricText);
-            SubMetric subMetric = null;
-            for (SubMetric item : metric.subMetrics) {
+        if (local.federated.containsKey(query.metricText)) {
+            FederatedMetricIndex.FederatedMetric metric = local.federated.get(query.metricText);
+            FederatedMetricIndex.SubMetric subMetric = null;
+            for (FederatedMetricIndex.SubMetric item : metric.subMetrics) {
                 if (item.isMatch(query.tagsText)) {
                     subMetric = item;
                     break;
@@ -87,7 +38,7 @@ public class FederatedMetricEngine {
             }
             if (subMetric==null) {
                 // TODO: exclude a priori wrong sub-metrics
-                for (SubMetric item : metric.subMetrics) {
+                for (FederatedMetricIndex.SubMetric item : metric.subMetrics) {
                     result.add(specialise(query, item));
                 }
             } else {
@@ -101,13 +52,19 @@ public class FederatedMetricEngine {
     }
 
     public boolean isSubMetric(String name) {
-        return subMetricsIndex.contains(name);
+        checkUpdateOutdatedCache();
+        FederatedMetricIndex local = this.index;
+
+        return local.subMetricsIndex.contains(name);
     }
 
     public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
-        if (!federated.containsKey(metric)) return metric;
-        SubMetric subMetric = null;
-        for (SubMetric item : federated.get(metric).subMetrics) {
+        checkUpdateOutdatedCache();
+        FederatedMetricIndex local = this.index;
+
+        if (!local.federated.containsKey(metric)) return metric;
+        FederatedMetricIndex.SubMetric subMetric = null;
+        for (FederatedMetricIndex.SubMetric item : local.federated.get(metric).subMetrics) {
             if (item.isMatch(tags)) {
                 subMetric = item;
                 break;
@@ -120,7 +77,13 @@ public class FederatedMetricEngine {
         return metric;
     }
 
-    TsdbQueryDto specialise(TsdbQueryDto queue, SubMetric metric) {
+    private void checkUpdateOutdatedCache() {
+        if (System.currentTimeMillis() - index.loadedAt > CACHE_TIMEOUT_MS) {
+            index = FederatedMetricIndex.load(tsdb);
+        }
+    }
+
+    private TsdbQueryDto specialise(TsdbQueryDto queue, FederatedMetricIndex.SubMetric metric) {
         TsdbQueryDto nova = new TsdbQueryDto();
         nova.metric = tsdb.metrics.getId(metric.name);
         nova.metricText = metric.name;
@@ -135,15 +98,5 @@ public class FederatedMetricEngine {
         nova.tags = queue.tags;
         nova.tagsText = queue.tagsText;
         return nova;
-    }
-
-    void initSubMetricIndex() {
-        subMetricsIndex = new HashSet<String>();
-        for (FederatedMetric metric : federated.values()) {
-            for (SubMetric sub : metric.subMetrics) {
-                if (sub.isHead()) continue;
-                subMetricsIndex.add(sub.name);
-            }
-        }
     }
 }

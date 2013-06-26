@@ -75,6 +75,11 @@ case $1 in
   (uid)
     MAINCLASS=UidManager
     ;;
+  (index)
+    shift
+    set uid "$@"
+    MAINCLASS=AddIndex
+    ;;
   (*)
     echo >&2 "$me: error: unknown command '$1'"
     usage
