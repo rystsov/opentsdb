@@ -14,7 +14,6 @@ import java.util.Scanner;
  * @date 6/25/13
  */
 public class FederatedMetricIndex {
-    public static final byte[] TSDB_INDEX = "tsdb-index".getBytes();
     public static final byte[] TSDB_INDEX_CF = "submetrics".getBytes();
     public static final byte[] TSDB_INDEX_Q = "all".getBytes();
 
@@ -55,12 +54,13 @@ public class FederatedMetricIndex {
     }
 
     public final TSDB tsdb;
+    final byte[] indextable;
     public Map<String, FederatedMetric> federated;
     public HashSet<String> subMetricsIndex;
     public long loadedAt;
 
-    public static FederatedMetricIndex load(final TSDB tsdb) {
-        FederatedMetricIndex loaded = new FederatedMetricIndex(tsdb);
+    public static FederatedMetricIndex load(final TSDB tsdb, final byte[] indextable) {
+        FederatedMetricIndex loaded = new FederatedMetricIndex(tsdb, indextable);
         loaded.federated = loaded.scan();
         loaded.initSubMetricIndex();
         loaded.loadedAt = System.currentTimeMillis();
@@ -72,7 +72,7 @@ public class FederatedMetricIndex {
         String json = new Gson().toJson(metric);
 
         putWithRetry(new PutRequest(
-                        TSDB_INDEX, metric.metric.getBytes(),
+                        indextable, metric.metric.getBytes(),
                         TSDB_INDEX_CF, TSDB_INDEX_Q, json.getBytes()
         ), MAX_ATTEMPTS_PUT, INITIAL_EXP_BACKOFF_DELAY);
     }
@@ -109,15 +109,16 @@ public class FederatedMetricIndex {
     }
 
     private org.hbase.async.Scanner getScanner() throws HBaseException {
-        final org.hbase.async.Scanner scanner = tsdb.client.newScanner(TSDB_INDEX);
+        final org.hbase.async.Scanner scanner = tsdb.client.newScanner(indextable);
         scanner.setFamily(TSDB_INDEX_CF);
         return scanner;
     }
 
 
 
-    private FederatedMetricIndex(final TSDB tsdb) {
+    private FederatedMetricIndex(final TSDB tsdb, final byte[] indextable) {
         this.tsdb = tsdb;
+        this.indextable = indextable;
     }
 
     private void initSubMetricIndex() {

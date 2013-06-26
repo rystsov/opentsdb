@@ -44,14 +44,15 @@ final class AddIndex {
 
         final String table = argp.get("--table", "tsdb");
         final String uidtable = argp.get("--uidtable", "tsdb-uid");
+        final String indextable = argp.get("--indextable", "tsdb-index");
         final short idwidth = (argp.has("--idwidth")
                                    ? Short.parseShort(argp.get("--idwidth"))
                                    : 3);
 
         final HBaseClient client = CliOptions.clientFromOptions(argp);
 
-        TSDB tsdb = new TSDB(client, table, uidtable);
-        FederatedMetricIndex index = FederatedMetricIndex.load(tsdb);
+        TSDB tsdb = new TSDB(client, table, uidtable, indextable);
+        FederatedMetricIndex index = FederatedMetricIndex.load(tsdb, indextable.getBytes());
 
         try {
             if (args[0].equals("add")) {

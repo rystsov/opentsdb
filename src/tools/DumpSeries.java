@@ -71,8 +71,11 @@ final class DumpSeries {
 
     final HBaseClient client = CliOptions.clientFromOptions(argp);
     final byte[] table = argp.get("--table", "tsdb").getBytes();
-    final TSDB tsdb = new TSDB(client, argp.get("--table", "tsdb"),
-                               argp.get("--uidtable", "tsdb-uid"));
+    final TSDB tsdb = new TSDB(
+            client,
+            argp.get("--table", "tsdb"),
+            argp.get("--uidtable", "tsdb-uid"),
+            argp.get("--indextable", "tsdb-index"));
     final boolean delete = argp.has("--delete");
     final boolean importformat = delete || argp.has("--import");
     argp = null;

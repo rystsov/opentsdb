@@ -143,11 +143,12 @@ final class TSDMain {
       // Make sure we don't even start if we can't find out tables.
       final String table = argp.get("--table", "tsdb");
       final String uidtable = argp.get("--uidtable", "tsdb-uid");
+      final String indextable = argp.get("--indextable", "tsdb-index");
       client.ensureTableExists(table).joinUninterruptibly();
       client.ensureTableExists(uidtable).joinUninterruptibly();
 
       client.setFlushInterval(flush_interval);
-      final TSDB tsdb = new TSDB(client, table, uidtable);
+      final TSDB tsdb = new TSDB(client, table, uidtable, indextable);
       registerShutdownHook(tsdb);
       final ServerBootstrap server = new ServerBootstrap(factory);
 

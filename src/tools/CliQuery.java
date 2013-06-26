@@ -106,8 +106,10 @@ final class CliQuery {
     }
 
     final HBaseClient client = CliOptions.clientFromOptions(argp);
-    final TSDB tsdb = new TSDB(client, argp.get("--table", "tsdb"),
-                               argp.get("--uidtable", "tsdb-uid"));
+    final TSDB tsdb = new TSDB(
+            client, argp.get("--table", "tsdb"),
+            argp.get("--uidtable", "tsdb-uid"),
+            argp.get("--indextable", "tsdb-index"));
     final String basepath = argp.get("--graph");
     argp = null;
 

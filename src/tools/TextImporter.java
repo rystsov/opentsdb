@@ -62,8 +62,11 @@ final class TextImporter {
     final HBaseClient client = CliOptions.clientFromOptions(argp);
     // Flush more frequently since we read very fast from the files.
     client.setFlushInterval((short) 500);  // ms
-    final TSDB tsdb = new TSDB(client, argp.get("--table", "tsdb"),
-                               argp.get("--uidtable", "tsdb-uid"));
+    final TSDB tsdb = new TSDB(
+            client,
+            argp.get("--table", "tsdb"),
+            argp.get("--uidtable", "tsdb-uid"),
+            argp.get("--indextable", "tsdb-index"));
     argp = null;
     try {
       int points = 0;

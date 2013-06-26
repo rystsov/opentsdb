@@ -14,12 +14,14 @@ public class FederatedMetricEngine {
     private static final long CACHE_TIMEOUT_MS = 10*60*1000;
 
     private final TSDB tsdb;
+    private final byte[] indextable;
 
     private volatile FederatedMetricIndex index;
 
-    public FederatedMetricEngine(TSDB tsdb) {
+    public FederatedMetricEngine(TSDB tsdb, byte[] indextable) {
         this.tsdb = tsdb;
-        this.index = FederatedMetricIndex.load(tsdb);
+        this.indextable = indextable;
+        this.index = FederatedMetricIndex.load(tsdb, indextable);
     }
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
@@ -79,7 +81,7 @@ public class FederatedMetricEngine {
 
     private void checkUpdateOutdatedCache() {
         if (System.currentTimeMillis() - index.loadedAt > CACHE_TIMEOUT_MS) {
-            index = FederatedMetricIndex.load(tsdb);
+            index = FederatedMetricIndex.load(tsdb, indextable);
         }
     }
 
