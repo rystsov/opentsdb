@@ -14,6 +14,9 @@ package net.opentsdb.tools;
 
 import net.opentsdb.core.FederatedMetricIndex;
 import net.opentsdb.core.TSDB;
+import net.opentsdb.core.model.Change;
+import net.opentsdb.core.model.FederatedMetric;
+import net.opentsdb.core.model.SubMetric;
 import net.opentsdb.uid.NoSuchUniqueId;
 import net.opentsdb.uid.NoSuchUniqueName;
 import net.opentsdb.uid.UniqueId;
@@ -56,51 +59,37 @@ final class AddIndex {
 
         try {
             if (args[0].equals("add")) {
-                FederatedMetricIndex.FederatedMetric metric = index.get(args[1]);
-
                 if (args.length<3) {
                     throw new RuntimeException("You should specify tags, like: index add metric key=value[ key=value[..]]");
                 }
 
-
-                FederatedMetricIndex.SubMetric submetric = new FederatedMetricIndex.SubMetric();
-                submetric.tags = new TreeMap<String, String>();
+                Change change = new Change();
+                change.tags = new HashMap<String, String>();
+                change.ts = System.currentTimeMillis();
                 for(int i=2;i<args.length;i++) {
                     String[] parts = args[i].split("=");
                     if (parts.length!=2) throw new RuntimeException("Got: " + args[i] + " but should be: key=value");
-                    if (submetric.tags.containsKey(parts[0])) {
+                    if (change.tags.containsKey(parts[0])) {
                         throw  new RuntimeException("Collision in keys: " + parts[0]);
                     }
-                    submetric.tags.put(parts[0], parts[1]);
-                }
-                submetric.name = args[1];
-                for (Map.Entry<String, String> tag : submetric.tags.entrySet()) {
-                    submetric.name += "/" + tag.getKey() + "/" + tag.getValue();
+                    change.tags.put(parts[0], parts[1]);
                 }
 
-                if (metric==null) {
-                    metric = new FederatedMetricIndex.FederatedMetric();
-                    metric.metric = args[1];
+                SortedSet<Change> changes = index.get(args[1]);
+                changes = changes==null ? new TreeSet<Change>() : new TreeSet<Change>(changes);
+                changes.add(change);
 
-                    FederatedMetricIndex.SubMetric head = new FederatedMetricIndex.SubMetric();
-                    head.name = args[1];
-                    metric.subMetrics.add(head);
-                } else {
-                    for (FederatedMetricIndex.SubMetric item : metric.subMetrics) {
-                        if (item.name.equals(submetric.name)) {
-                            System.out.println("SubMetric " + submetric.name + " alread exists");
-                            return;
-                        }
-                    }
-                }
+                // check change is consistent
+                FederatedMetric metric = FederatedMetric.create(args[1], changes);
+
                 final UniqueId uid = new UniqueId(client, uidtable.getBytes(), "metrics", (int) idwidth);
-                uid.getOrCreateId(submetric.name);
-                metric.subMetrics.add(submetric);
-                index.put(metric);
+                uid.getOrCreateId(change.subMetricName(metric.metric));
+
+                index.put(metric.metric, changes);
             } else if (args[0].equals("list")) {
-                for(FederatedMetricIndex.FederatedMetric metric : index.list()) {
+                for(FederatedMetric metric : index.list()) {
                     System.out.println("Federated metric: " + metric.metric);
-                    for (FederatedMetricIndex.SubMetric subMetric : metric.subMetrics) {
+                    for (SubMetric subMetric : metric.subMetrics) {
                         System.out.println("\tsubmetric: " + subMetric.name);
                         for (String key : subMetric.tags.keySet()) {
                             System.out.println("\t\t" + key + "=" + subMetric.tags.get(key));

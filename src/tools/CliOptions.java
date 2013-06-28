@@ -37,6 +37,9 @@ final class CliOptions {
     argp.addOption("--uidtable", "TABLE",
                    "Name of the HBase table to use for Unique IDs"
                    + " (default: tsdb-uid).");
+    argp.addOption("--indextable", "TABLE",
+                   "Name of the HBase table to use for index"
+                   + " (default: tsdb-index).");
     argp.addOption("--zkquorum", "SPEC",
                    "Specification of the ZooKeeper quorum to use"
                    + " (default: localhost).");

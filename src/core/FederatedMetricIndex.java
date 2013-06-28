@@ -1,7 +1,10 @@
 package net.opentsdb.core;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.stumbleupon.async.Deferred;
+import net.opentsdb.core.model.Change;
+import net.opentsdb.core.model.FederatedMetric;
 import org.hbase.async.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,69 +28,53 @@ public class FederatedMetricIndex {
 
     private static final Logger LOG = LoggerFactory.getLogger(FederatedMetricIndex.class);
 
-    public static class FederatedMetric {
-        public String metric;
 
-        public List<SubMetric> subMetrics = new ArrayList<SubMetric>();
-    }
 
-    public static class SubMetric {
-        public String name;
-        public Map<String, String> tags;
-
-        public SubMetric() {
-            tags = new HashMap<String, String>();
-        }
-
-        public boolean isHead() {
-            return tags.isEmpty();
-        }
-
-        public boolean isMatch(final Map<String, String> tags) {
-            if (isHead()) return false;
-            for (String key : this.tags.keySet()) {
-                if (!tags.containsKey(key)) return false;
-                if (!tags.get(key).equals(this.tags.get(key))) return false;
-            }
-            return true;
-        }
-    }
 
     public final TSDB tsdb;
     final byte[] indextable;
-    public Map<String, FederatedMetric> federated;
-    public HashSet<String> subMetricsIndex;
+
     public long loadedAt;
+
+    public Map<String, SortedSet<Change>> index;
+    public Map<String, FederatedMetric> head;
+    public HashSet<String> subMetricsIndex;
+
 
     public static FederatedMetricIndex load(final TSDB tsdb, final byte[] indextable) {
         FederatedMetricIndex loaded = new FederatedMetricIndex(tsdb, indextable);
-        loaded.federated = loaded.scan();
+        loaded.index = loaded.scan();
         loaded.initSubMetricIndex();
+        loaded.fillHead();
         loaded.loadedAt = System.currentTimeMillis();
         return loaded;
     }
 
 
-    public void put(FederatedMetric metric) {
-        String json = new Gson().toJson(metric);
+    public void put(String metric, SortedSet<Change> changes) {
+        String json = new Gson().toJson(changes);
 
         putWithRetry(new PutRequest(
-                        indextable, metric.metric.getBytes(),
+                        indextable, metric.getBytes(),
                         TSDB_INDEX_CF, TSDB_INDEX_Q, json.getBytes()
         ), MAX_ATTEMPTS_PUT, INITIAL_EXP_BACKOFF_DELAY);
     }
 
-    public FederatedMetric get(String name) {
-        return federated.containsKey(name) ? federated.get(name) : null;
+    public SortedSet<Change> get(String name) {
+        return index.containsKey(name) ? index.get(name) : null;
     }
 
     public Collection<FederatedMetric> list() {
-        return Collections.unmodifiableCollection(federated.values());
+        List<FederatedMetric> result = new ArrayList<FederatedMetric>();
+        for (String key : index.keySet()) {
+            result.add(FederatedMetric.create(key, index.get(key)));
+        }
+        return result;
     }
 
 
-    private Map<String, FederatedMetric> scan() {
-        Map<String, FederatedMetric> metrics = new HashMap<String, FederatedMetric>();
+    private Map<String, SortedSet<Change>> scan() {
+        Map<String, SortedSet<Change>> metrics = new HashMap<String, SortedSet<Change>>();
         final org.hbase.async.Scanner scanner = getScanner();
         ArrayList<ArrayList<KeyValue>> rows;
         try {
@@ -95,11 +82,14 @@ public class FederatedMetricIndex {
                 for (final ArrayList<KeyValue> row : rows) {
                     if (row.size()!=1) throw new RuntimeException("Corrupted index");
 
-                    FederatedMetric metric = new Gson().fromJson(
-                            new String(row.get(0).value()),
-                            FederatedMetric.class
+                    List<Change> changes = new Gson().fromJson(
+                        new String(row.get(0).value()),
+                        new TypeToken<List<Change>>() {}.getType()
                     );
-                    metrics.put(metric.metric, metric);
+
+                    metrics.put(
+                            new String(row.get(0).key()),
+                            new TreeSet<Change>(changes));
                 }
             }
         } catch (Exception e) {
@@ -123,11 +113,18 @@ public class FederatedMetricIndex {
 
     private void initSubMetricIndex() {
         subMetricsIndex = new HashSet<String>();
-        for (FederatedMetric metric : federated.values()) {
-            for (SubMetric sub : metric.subMetrics) {
-                if (sub.isHead()) continue;
-                subMetricsIndex.add(sub.name);
+
+        for (String key : index.keySet()) {
+            for (Change sub : index.get(key)) {
+                subMetricsIndex.add(sub.subMetricName(key));
             }
+        }
+    }
+
+    private void fillHead() {
+        head = new HashMap<String, FederatedMetric>();
+        for (String key : index.keySet()) {
+            head.put(key, FederatedMetric.create(key, index.get(key)));
         }
     }
 

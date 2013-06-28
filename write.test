@@ -1,0 +1,30 @@
+set -e
+
+metric=ya
+
+./build/tsdb mkmetric $metric
+./build/tsdb index add $metric cluster=b
+./build/tsdb index add $metric cluster=a
+
+now=$(date +%s)
+echo "put $metric $now 16 cluster=a host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 8 cluster=b host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 8 host=local" | nc -w 30 127.0.0.1 4242
+sleep 3s
+
+now=$(date +%s)
+echo "put $metric $now 14 cluster=a host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 6 cluster=b host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 1 host=local" | nc -w 30 127.0.0.1 4242
+sleep 3s
+
+now=$(date +%s)
+echo "put $metric $now 18 cluster=a host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 6 cluster=b host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 0 host=local" | nc -w 30 127.0.0.1 4242
+sleep 3s
+
+now=$(date +%s)
+echo "put $metric $now 16 cluster=a host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 10 cluster=b host=local" | nc -w 30 127.0.0.1 4242
+echo "put $metric $now 4 host=local" | nc -w 30 127.0.0.1 4242

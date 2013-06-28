@@ -12,6 +12,7 @@ test -d "$HBASE_HOME" || {
 
 TSDB_TABLE=${TSDB_TABLE-'tsdb'}
 UID_TABLE=${UID_TABLE-'tsdb-uid'}
+INDEX_TABLE=${INDEX_TABLE-'tsdb-index'}
 BLOOMFILTER=${BLOOMFILTER-'ROW'}
 # LZO requires lzo2 64bit to be installed + the hadoop-gpl-compression jar.
 COMPRESSION=${COMPRESSION-'LZO'}
@@ -37,4 +38,7 @@ create '$UID_TABLE',
 
 create '$TSDB_TABLE',
   {NAME => 't', VERSIONS => 1, COMPRESSION => '$COMPRESSION', BLOOMFILTER => '$BLOOMFILTER'}
+
+create 'INDEX_TABLE',
+  {NAME => 'submetrics'}
 EOF
