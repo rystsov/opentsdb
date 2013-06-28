@@ -12,8 +12,11 @@ public class FederatedMetric {
     public final String metric;
     public final List<SubMetric> subMetrics;
 
-    private FederatedMetric(String metric) {
-        this(metric, new ArrayList<SubMetric>());
+    public FederatedMetric(String metric) {
+        List<SubMetric> core = new ArrayList<SubMetric>();
+        core.add(new SubMetric(metric, new HashMap<String, String>()));
+        this.metric = metric;
+        this.subMetrics = Collections.unmodifiableList(core);
     }
 
     private FederatedMetric(String metric, List<SubMetric> subMetrics) {
@@ -23,9 +26,7 @@ public class FederatedMetric {
 
     public static FederatedMetric create(String metric, SortedSet<Change> changes) {
         if (changes==null) return null;
-        List<SubMetric> core = new ArrayList<SubMetric>();
-        core.add(new SubMetric(metric, new HashMap<String, String>()));
-        FederatedMetric result = new FederatedMetric(metric, core);
+        FederatedMetric result = new FederatedMetric(metric);
         for (Change change : changes) {
             result = result.apply(change);
         }
