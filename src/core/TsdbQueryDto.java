@@ -12,6 +12,7 @@
 // see <http://www.gnu.org/licenses/>.
 package net.opentsdb.core;
 
+import com.google.gson.Gson;
 import net.opentsdb.uid.NoSuchUniqueName;
 import org.hbase.async.Bytes;
 import org.hbase.async.HBaseException;
@@ -134,5 +135,30 @@ public final class TsdbQueryDto {
         // Additionally, in case our sample_interval is large, we need to look
         // even further before/after, so use that too.
         return this.end_time + Const.MAX_TIMESPAN + 1 + this.sample_interval;
+    }
+
+    @Override
+    public String toString() {
+        String query = metricText + " " + (tagsText==null ? "{}" : new Gson().toJson(tagsText));
+        query += " [" + start_time + ", " + (end_time==null ? "*" : end_time) + "]";
+
+        return query;
+    }
+
+    public TsdbQueryDto clone() {
+        TsdbQueryDto nova = new TsdbQueryDto();
+        nova.metric = metric;
+        nova.metricText = metricText;
+        nova.start_time = start_time;
+        nova.end_time = end_time;
+        nova.aggregator = aggregator;
+        nova.rate = rate;
+        nova.downsampler = downsampler;
+        nova.sample_interval = sample_interval;
+        nova.group_by_values = group_by_values;
+        nova.group_bys = group_bys;
+        nova.tags = tags;
+        nova.tagsText = tagsText;
+        return nova;
     }
 }
