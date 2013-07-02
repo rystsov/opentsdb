@@ -116,7 +116,9 @@ public class FederatedMetricIndex {
 
         for (String key : index.keySet()) {
             for (Change sub : index.get(key)) {
-                subMetricsIndex.add(sub.subMetricName(key));
+                if (sub.type== Change.ChangeType.ADD) {
+                    subMetricsIndex.add(sub.subMetricName(key));
+                }
             }
         }
     }

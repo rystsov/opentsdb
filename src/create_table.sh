@@ -39,6 +39,6 @@ create '$UID_TABLE',
 create '$TSDB_TABLE',
   {NAME => 't', VERSIONS => 1, COMPRESSION => '$COMPRESSION', BLOOMFILTER => '$BLOOMFILTER'}
 
-create 'INDEX_TABLE',
+create '$INDEX_TABLE',
   {NAME => 'submetrics'}
 EOF

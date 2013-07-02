@@ -14,7 +14,7 @@ public class SubMetric {
 
     public SubMetric(String name, Map<String, String> tags) {
         this.name = name;
-        this.tags = Collections.unmodifiableMap(tags);
+        this.tags = Collections.unmodifiableMap(new HashMap<String, String>(tags));
     }
 
     public boolean isHead() {

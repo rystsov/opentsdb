@@ -34,16 +34,40 @@ public class FederatedMetric {
     }
 
     public FederatedMetric apply(Change change) {
-        String subMetricName = change.subMetricName(metric);
-
-        for (SubMetric item : subMetrics) {
-            if (item.name.equals(subMetricName)) {
-                throw new RuntimeException("SubMetric " + subMetricName + " alread exists");
-            }
+        Set<String> submetrics = new HashSet<String>();
+        for (SubMetric item : this.subMetrics) {
+            submetrics.add(item.name);
         }
 
-        List<SubMetric> nova = new ArrayList<SubMetric>(subMetrics);
-        nova.add(new SubMetric(subMetricName, change.tags));
-        return new FederatedMetric(metric, nova);
+        if (change.type==Change.ChangeType.ADD) {
+            String subMetricName = change.subMetricName(metric);
+            if (submetrics.contains(subMetricName)) {
+                throw new RuntimeException("SubMetric " + subMetricName + " alread exists");
+            }
+            List<SubMetric> nova = new ArrayList<SubMetric>(this.subMetrics);
+            nova.add(new SubMetric(subMetricName, change.tags));
+            return new FederatedMetric(metric, nova);
+        } else if (change.type== Change.ChangeType.REMOVE) {
+            String subMetricName = change.subMetricName(metric);
+            if (!submetrics.contains(subMetricName)) {
+                throw new RuntimeException("SubMetric " + subMetricName + " alread exists");
+            }
+            List<SubMetric> nova = new ArrayList<SubMetric>();
+            for (SubMetric submetric : this.subMetrics) {
+                if (submetric.name.equals(subMetricName)) continue;
+                nova.add(submetric);
+            }
+            return new FederatedMetric(metric, nova);
+        } else {
+            throw new RuntimeException();
+        }
+
+
+
+
+
+
+
+
     }
 }
