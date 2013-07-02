@@ -283,6 +283,13 @@ final class UidManager {
                             final byte[] table,
                             final short idwidth,
                             final String[] args) {
+    if (args[1].equals("metrics")) {
+      for (int i = 2; i < args.length; i++) {
+        if (args[i].contains("/")) {
+          throw new RuntimeException("\"" + args[i] + "\"" + " is bad name for metric, metric can't contain \"/\"");
+        }
+      }
+    }
     final UniqueId uid = new UniqueId(client, table, args[1], (int) idwidth);
     for (int i = 2; i < args.length; i++) {
       try {
