@@ -46,6 +46,7 @@ import net.opentsdb.stats.StatsCollector;
 public final class TSDB {
 
   static final byte[] FAMILY = { 't' };
+  static final Histogram scanlatency = new Histogram(16000, (short) 2, 100);
 
   private static final String METRICS_QUAL = "metrics";
   private static final short METRICS_WIDTH = 3;
@@ -160,7 +161,7 @@ public final class TSDB {
 
     collector.addExtraTag("class", "TsdbQuery");
     try {
-      collector.record("hbase.latency", _TsdbQuery.scanlatency, "method=scan");
+      collector.record("hbase.latency", TSDB.scanlatency, "method=scan");
     } finally {
       collector.clearExtraTag("class");
     }
@@ -195,7 +196,7 @@ public final class TSDB {
 
   /** Returns a latency histogram for Scan RPCs used to fetch data points.  */
   public Histogram getScanLatencyHistogram() {
-    return _TsdbQuery.scanlatency;
+    return TSDB.scanlatency;
   }
 
   /**
@@ -210,9 +211,6 @@ public final class TSDB {
     collector.record("uid.cache-size", uid.cacheSize(), "kind=" + uid.kind());
   }
 
-  /**
-   * Returns a new {@link Query} instance suitable for this TSDB.
-   */
   public TsdbQueryDtoBuilder newQuery() {
     return new TsdbQueryDtoBuilder(this);
   }

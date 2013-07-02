@@ -27,9 +27,6 @@ import java.util.*;
 
 import static org.hbase.async.Bytes.ByteMap;
 
-/**
- * Non-synchronized implementation of {@link net.opentsdb.core.Query}.
- */
 public final class TsdbQueryLoader {
     /**
      * Comparator that ignores timestamps in row keys.
@@ -134,7 +131,7 @@ public final class TsdbQueryLoader {
             throw new RuntimeException("Should never be here", e);
         } finally {
             hbase_time += (System.nanoTime() - starttime) / 1000000;
-            _TsdbQuery.scanlatency.add(hbase_time);
+            TSDB.scanlatency.add(hbase_time);
         }
         LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
         if (nrows == 0) {
