@@ -38,7 +38,6 @@ tsdb_SRC := \
 	src/core/IncomingDataPoints.java	\
 	src/core/IllegalDataException.java	\
 	src/core/Internal.java	\
-	src/core/Query.java	\
 	src/core/RowKey.java	\
 	src/core/RowSeq.java	\
 	src/core/SeekableView.java	\
@@ -46,7 +45,6 @@ tsdb_SRC := \
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\
 	src/core/Tags.java	\
-	src/core/_TsdbQuery.java	\
 	src/core/WritableDataPoints.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
@@ -81,11 +79,18 @@ tsdb_SRC := \
 	src/core/TsdbQueryDtoBuilder.java	\
 	src/core/TsdbQueryLoader.java	\
 	src/core/TsdbQueryAggregator.java \
-	src/core/FederatedMetricEngine.java
+	src/core/FederatedMetricEngine.java	\
+	src/core/FederatedMetricIndex.java	\
+	src/core/model/Change.java	\
+	src/core/model/Era.java	\
+	src/core/model/FederatedMetric.java	\
+	src/core/model/SubMetric.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\
 	$(GUAVA)	\
+	$(GSON)	\
+	$(JODATIME)	\
 	$(LOG4J_OVER_SLF4J)	\
 	$(LOGBACK_CLASSIC)	\
 	$(LOGBACK_CORE)	\
@@ -381,6 +386,8 @@ pom.xml: pom.xml.in Makefile
 	    -e 's/@ASYNCHBASE_VERSION@/$(ASYNCHBASE_VERSION)/' \
 	    -e 's/@GUAVA_VERSION@/$(GUAVA_VERSION)/' \
 	    -e 's/@GWT_VERSION@/$(GWT_VERSION)/' \
+	    -e 's/@GSON_VERSION@/$(GSON_VERSION)/' \
+	    -e 's/@JODATIME_VERSION@/$(JODATIME_VERSION)/' \
 	    -e 's/@HAMCREST_VERSION@/$(HAMCREST_VERSION)/' \
 	    -e 's/@JAVASSIST_VERSION@/$(JAVASSIST_VERSION)/' \
 	    -e 's/@JUNIT_VERSION@/$(JUNIT_VERSION)/' \
