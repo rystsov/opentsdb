@@ -3,6 +3,7 @@ package net.opentsdb.core;
 import net.opentsdb.core.model.Era;
 import net.opentsdb.core.model.FederatedMetric;
 import net.opentsdb.core.model.SubMetric;
+import org.joda.time.DateTimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +101,7 @@ public class FederatedMetricEngine {
     }
 
     private synchronized void checkUpdateOutdatedCache() {
-        if (System.currentTimeMillis() - index.loadedAt > cacheTimeoutMs) {
+        if (DateTimeUtils.currentTimeMillis() - index.loadedAt > cacheTimeoutMs) {
             index = FederatedMetricIndex.load(tsdb, indextable);
         }
     }
