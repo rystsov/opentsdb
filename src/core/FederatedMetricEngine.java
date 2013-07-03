@@ -15,27 +15,30 @@ import java.util.*;
 public class FederatedMetricEngine {
     private static final Logger LOG = LoggerFactory.getLogger(FederatedMetricEngine.class);
     //private static final long CACHE_TIMEOUT_MS = 10*60*1000;
-    //TODO: change CACHE_TIMEOUT_MS
-    private static final long CACHE_TIMEOUT_MS = 1000;
+    //TODO: change CACHE_TIMEOUT_MS, extract into settings
+    // private static final long _CACHE_TIMEOUT_MS = 1000;
 
     private final TSDB tsdb;
     private final byte[] indextable;
+    private final long cacheTimeoutMs;
 
     private volatile FederatedMetricIndex index;
 
-    public FederatedMetricEngine(TSDB tsdb, byte[] indextable) {
+    public FederatedMetricEngine(TSDB tsdb, byte[] indextable, long cacheTimeoutMs) {
         this.tsdb = tsdb;
         this.indextable = indextable;
         this.index = FederatedMetricIndex.load(tsdb, indextable);
+        this.cacheTimeoutMs = cacheTimeoutMs;
     }
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
+        checkUpdateOutdatedCache();
         FederatedMetricIndex local = this.index;
 
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
         if (local.index.containsKey(query.metricText)) {
             SortedSet<Era> eras = Era.build(query.metricText, local.index.get(query.metricText));
-            eras = Era.filter(eras, query.start_time*1000, query.end_time==null?null:query.end_time*1000, CACHE_TIMEOUT_MS);
+            eras = Era.filter(eras, query.start_time*1000, query.end_time==null?null:query.end_time*1000, cacheTimeoutMs);
 
             for (Era era : eras) {
                 List<SubMetric> subMetrics = new ArrayList<SubMetric>();
@@ -96,8 +99,8 @@ public class FederatedMetricEngine {
         return metric;
     }
 
-    private void checkUpdateOutdatedCache() {
-        if (System.currentTimeMillis() - index.loadedAt > CACHE_TIMEOUT_MS) {
+    private synchronized void checkUpdateOutdatedCache() {
+        if (System.currentTimeMillis() - index.loadedAt > cacheTimeoutMs) {
             index = FederatedMetricIndex.load(tsdb, indextable);
         }
     }
@@ -109,13 +112,13 @@ public class FederatedMetricEngine {
         nova.start_time = Math.max(queue.start_time*1000, era.from);
         if (queue.end_time != null) {
             if (era.to!=null) {
-                nova.end_time = Math.min(era.to+2*CACHE_TIMEOUT_MS, queue.end_time*1000);
+                nova.end_time = Math.min(era.to+2*cacheTimeoutMs, queue.end_time*1000);
             } else {
                 nova.end_time = queue.end_time*1000;
             }
         } else {
             if (era.to!=null) {
-                nova.end_time = era.to+2*CACHE_TIMEOUT_MS;
+                nova.end_time = era.to+2*cacheTimeoutMs;
             } else {
                 nova.end_time = null;
             }

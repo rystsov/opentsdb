@@ -28,7 +28,6 @@ import net.opentsdb.core.TsdbQueryDto;
 import net.opentsdb.core.TsdbQueryAggregator;
 import net.opentsdb.core.Aggregator;
 import net.opentsdb.core.Aggregators;
-import net.opentsdb.core.Query;
 import net.opentsdb.core.DataPoint;
 import net.opentsdb.core.DataPoints;
 import net.opentsdb.core.Tags;
@@ -109,7 +108,9 @@ final class CliQuery {
     final TSDB tsdb = new TSDB(
             client, argp.get("--table", "tsdb"),
             argp.get("--uidtable", "tsdb-uid"),
-            argp.get("--indextable", "tsdb-index"));
+            argp.get("--indextable", "tsdb-index"),
+            // TODO: change 1000 to 60*10*1000
+            Long.parseLong(argp.get("--cache-timeout-ms", "1000")));
     final String basepath = argp.get("--graph");
     argp = null;
 
@@ -187,7 +188,7 @@ final class CliQuery {
    * Parses the query from the command lines.
    * @param args The command line arguments.
    * @param tsdb The TSDB to use.
-   * @param queries The list in which {@link Query}s will be appended.
+   * @param queries The list in which {@link TsdbQueryDto}s will be appended.
    * @param plotparams The list in which global plot parameters will be
    * appended.  Ignored if {@code null}.
    * @param plotoptions The list in which per-line plot options will be

@@ -144,11 +144,13 @@ final class TSDMain {
       final String table = argp.get("--table", "tsdb");
       final String uidtable = argp.get("--uidtable", "tsdb-uid");
       final String indextable = argp.get("--indextable", "tsdb-index");
+      // TODO: change 1000 to 60*10*1000
+      final Long cacheTimeoutMs = Long.parseLong(argp.get("--cache-timeout-ms", "1000"));
       client.ensureTableExists(table).joinUninterruptibly();
       client.ensureTableExists(uidtable).joinUninterruptibly();
 
       client.setFlushInterval(flush_interval);
-      final TSDB tsdb = new TSDB(client, table, uidtable, indextable);
+      final TSDB tsdb = new TSDB(client, table, uidtable, indextable, cacheTimeoutMs);
       registerShutdownHook(tsdb);
       final ServerBootstrap server = new ServerBootstrap(factory);
 

@@ -95,7 +95,8 @@ public final class TSDB {
   public TSDB(final HBaseClient client,
               final String timeseries_table,
               final String uniqueids_table,
-              final String index_table) {
+              final String index_table,
+              final long cacheTimeoutMs) {
     this.client = client;
     table = timeseries_table.getBytes();
 
@@ -107,7 +108,7 @@ public final class TSDB {
     compactionq = new CompactionQueue(this);
 
     final byte[] indextable = index_table.getBytes();
-    federatedMetrics = new FederatedMetricEngine(this, indextable);
+    federatedMetrics = new FederatedMetricEngine(this, indextable, cacheTimeoutMs);
   }
 
   public List<TsdbQueryDto> splitIfFederated(TsdbQueryDto query) {

@@ -25,7 +25,6 @@ import org.hbase.async.Scanner;
 
 import net.opentsdb.core.IllegalDataException;
 import net.opentsdb.core.Internal;
-import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
 import net.opentsdb.core.TsdbQueryDtoBuilder;
 import net.opentsdb.core.TsdbQueryDto;
@@ -75,7 +74,9 @@ final class DumpSeries {
             client,
             argp.get("--table", "tsdb"),
             argp.get("--uidtable", "tsdb-uid"),
-            argp.get("--indextable", "tsdb-index"));
+            argp.get("--indextable", "tsdb-index"),
+            // TODO: change 1000 to 60*10*1000
+            Long.parseLong(argp.get("--cache-timeout-ms", "1000")));
     final boolean delete = argp.has("--delete");
     final boolean importformat = delete || argp.has("--import");
     argp = null;

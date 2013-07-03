@@ -66,7 +66,9 @@ final class TextImporter {
             client,
             argp.get("--table", "tsdb"),
             argp.get("--uidtable", "tsdb-uid"),
-            argp.get("--indextable", "tsdb-index"));
+            argp.get("--indextable", "tsdb-index"),
+            // TODO: change 1000 to 60*10*1000
+            Long.parseLong(argp.get("--cache-timeout-ms", "1000")));
     argp = null;
     try {
       int points = 0;
