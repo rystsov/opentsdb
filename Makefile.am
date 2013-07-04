@@ -57,6 +57,7 @@ tsdb_SRC := \
 	src/tools/TSDMain.java	\
 	src/tools/TextImporter.java	\
 	src/tools/UidManager.java	\
+	src/tools/AddIndex.java	\
 	src/tsd/BadRequestException.java	\
 	src/tsd/ConnectionManager.java	\
 	src/tsd/GnuplotException.java	\
