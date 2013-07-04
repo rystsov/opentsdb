@@ -1,6 +1,6 @@
 set -e
 
-metric=yarrrrr
+metric=gg
 
 ./build/tsdb mkmetric $metric
 

@@ -40,7 +40,7 @@ public class FederatedMetric {
         if (change.type==Change.ChangeType.ADD) {
             String subMetricName = change.subMetricName(metric);
             if (submetrics.contains(subMetricName)) {
-                throw new RuntimeException("SubMetric " + subMetricName + " alread exists");
+                throw new RuntimeException("SubMetric " + subMetricName + " already exists");
             }
             List<SubMetric> nova = new ArrayList<SubMetric>(this.subMetrics);
             nova.add(new SubMetric(subMetricName, change.tags));
@@ -48,7 +48,7 @@ public class FederatedMetric {
         } else if (change.type== Change.ChangeType.REMOVE) {
             String subMetricName = change.subMetricName(metric);
             if (!submetrics.contains(subMetricName)) {
-                throw new RuntimeException("SubMetric " + subMetricName + " alread exists");
+                throw new RuntimeException("SubMetric " + subMetricName + " doesn't exist");
             }
             List<SubMetric> nova = new ArrayList<SubMetric>();
             for (SubMetric submetric : this.subMetrics) {

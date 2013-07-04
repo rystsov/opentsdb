@@ -3,7 +3,6 @@ package net.opentsdb.core.index;
 import net.opentsdb.core.TsdbQueryDto;
 import net.opentsdb.core.index.model.Era;
 import net.opentsdb.core.index.model.SubMetric;
-import org.hbase.async.HBaseClient;
 import org.joda.time.DateTimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +105,7 @@ public class FederatedMetricEngine {
 
     private TsdbQueryDto specialise(TsdbQueryDto queue, Era era, SubMetric metric) {
         TsdbQueryDto nova = queue.clone();
-        nova.metric = resolver.resolveMetric(metric.name);
+        nova.metric = resolver.getMetric(metric.name);
         nova.metricText = metric.name;
         nova.start_time = Math.max(queue.start_time*1000, era.from);
         if (queue.end_time != null) {

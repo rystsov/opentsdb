@@ -4,6 +4,7 @@ import net.opentsdb.core.index.model.Change;
 import net.opentsdb.core.index.model.FederatedMetric;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.SortedSet;
 
 /**
@@ -15,11 +16,13 @@ public interface Index {
 
     FederatedMetric getFederatedMetric(String metric);
 
-    void putChanges(String metric, SortedSet<Change> changes);
-
     SortedSet<Change> getChanges(String name);
 
     Collection<FederatedMetric> list();
 
     long snapshotTS();
+
+    void addIndex(String metric, HashMap<String, String> tags);
+
+    void removeIndex(String metric, HashMap<String, String> tags);
 }

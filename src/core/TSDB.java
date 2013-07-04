@@ -51,12 +51,12 @@ public final class TSDB {
   static final byte[] FAMILY = { 't' };
   static final Histogram scanlatency = new Histogram(16000, (short) 2, 100);
 
-  private static final String METRICS_QUAL = "metrics";
-  private static final short METRICS_WIDTH = 3;
-  private static final String TAG_NAME_QUAL = "tagk";
-  private static final short TAG_NAME_WIDTH = 3;
-  private static final String TAG_VALUE_QUAL = "tagv";
-  private static final short TAG_VALUE_WIDTH = 3;
+  public static final String METRICS_QUAL = "metrics";
+  public static final short METRICS_WIDTH = 3;
+  public static final String TAG_NAME_QUAL = "tagk";
+  public static final short TAG_NAME_WIDTH = 3;
+  public static final String TAG_VALUE_QUAL = "tagv";
+  public static final short TAG_VALUE_WIDTH = 3;
 
   static final boolean enable_compactions;
   static {
@@ -86,6 +86,7 @@ public final class TSDB {
    */
   private final CompactionQueue compactionq;
   private final FederatedMetricEngine federatedMetrics;
+  private final byte[] uidtable;
 
   /**
    * Constructor.
@@ -103,7 +104,7 @@ public final class TSDB {
     this.client = client;
     table = timeseries_table.getBytes();
 
-    final byte[] uidtable = uniqueids_table.getBytes();
+    uidtable = uniqueids_table.getBytes();
     metrics = new UniqueId(client, uidtable, METRICS_QUAL, METRICS_WIDTH);
     tag_names = new UniqueId(client, uidtable, TAG_NAME_QUAL, TAG_NAME_WIDTH);
     tag_values = new UniqueId(client, uidtable, TAG_VALUE_QUAL,
@@ -111,7 +112,7 @@ public final class TSDB {
     compactionq = new CompactionQueue(this);
 
     final byte[] indextable = index_table.getBytes();
-    federatedMetrics = new FederatedMetricEngine(new HBaseIndex.Loader(client, indextable), this.asIdResolver(), cacheTimeoutMs);
+    federatedMetrics = new FederatedMetricEngine(new HBaseIndex.Loader(asIdResolver(), client, indextable), this.asIdResolver(), cacheTimeoutMs);
   }
 
   public List<TsdbQueryDto> splitIfFederated(TsdbQueryDto query) {
@@ -125,9 +126,15 @@ public final class TSDB {
   public IdResolver asIdResolver() {
       return new IdResolver() {
           @Override
-          public byte[] resolveMetric(String metric) {
+          public byte[] getMetric(String metric) {
               return TSDB.this.metrics.getId(metric);
           }
+
+          @Override
+          public byte[] getOrCreateMetric(String metric) {
+              return TSDB.this.metrics.getOrCreateId(metric);
+          }
+
       };
   }
 

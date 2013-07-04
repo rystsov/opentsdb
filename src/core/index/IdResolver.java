@@ -5,5 +5,7 @@ package net.opentsdb.core.index;
  * @date 7/4/13
  */
 public interface IdResolver {
-    byte[] resolveMetric(String metric);
+    byte[] getMetric(String metric);
+    byte[] getOrCreateMetric(String metric);
+
 }
