@@ -1,8 +1,9 @@
-package net.opentsdb.core;
+package net.opentsdb.core.index;
 
-import net.opentsdb.core.model.Era;
-import net.opentsdb.core.model.FederatedMetric;
-import net.opentsdb.core.model.SubMetric;
+import net.opentsdb.core.TsdbQueryDto;
+import net.opentsdb.core.index.model.Era;
+import net.opentsdb.core.index.model.SubMetric;
+import org.hbase.async.HBaseClient;
 import org.joda.time.DateTimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,26 +20,26 @@ public class FederatedMetricEngine {
     //TODO: change CACHE_TIMEOUT_MS, extract into settings
     // private static final long _CACHE_TIMEOUT_MS = 1000;
 
-    private final TSDB tsdb;
-    private final byte[] indextable;
+    private final IndexLoader loader;
     private final long cacheTimeoutMs;
+    private final IdResolver resolver;
 
-    private volatile FederatedMetricIndex index;
+    private volatile Index index;
 
-    public FederatedMetricEngine(TSDB tsdb, byte[] indextable, long cacheTimeoutMs) {
-        this.tsdb = tsdb;
-        this.indextable = indextable;
-        this.index = FederatedMetricIndex.load(tsdb, indextable);
+    public FederatedMetricEngine(IndexLoader loader, IdResolver resolver, long cacheTimeoutMs) {
+        this.loader = loader;
+        this.index = loader.load();
         this.cacheTimeoutMs = cacheTimeoutMs;
+        this.resolver = resolver;
     }
 
     public List<TsdbQueryDto> split(TsdbQueryDto query) {
         checkUpdateOutdatedCache();
-        FederatedMetricIndex local = this.index;
+        Index local = this.index;
 
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
-        if (local.index.containsKey(query.metricText)) {
-            SortedSet<Era> eras = Era.build(query.metricText, local.index.get(query.metricText));
+        if (local.isFederated(query.metricText)) {
+            SortedSet<Era> eras = Era.build(query.metricText, local.getChanges(query.metricText));
             eras = Era.filter(eras, query.start_time*1000, query.end_time==null?null:query.end_time*1000, cacheTimeoutMs);
 
             for (Era era : eras) {
@@ -75,19 +76,16 @@ public class FederatedMetricEngine {
     }
 
     public boolean isSubMetric(String name) {
-        checkUpdateOutdatedCache();
-        FederatedMetricIndex local = this.index;
-
-        return local.subMetricsIndex.contains(name);
+        return name.contains("/");
     }
 
     public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
         checkUpdateOutdatedCache();
-        FederatedMetricIndex local = this.index;
+        Index local = this.index;
 
-        if (!local.head.containsKey(metric)) return metric;
+        if (!local.isFederated(metric)) return metric;
         SubMetric subMetric = null;
-        for (SubMetric item : local.head.get(metric).subMetrics) {
+        for (SubMetric item : local.getFederatedMetric(metric).subMetrics) {
             if (item.isMatch(tags)) {
                 subMetric = item;
                 break;
@@ -101,14 +99,14 @@ public class FederatedMetricEngine {
     }
 
     private synchronized void checkUpdateOutdatedCache() {
-        if (DateTimeUtils.currentTimeMillis() - index.loadedAt > cacheTimeoutMs) {
-            index = FederatedMetricIndex.load(tsdb, indextable);
+        if (DateTimeUtils.currentTimeMillis() - index.snapshotTS() > cacheTimeoutMs) {
+            index = loader.load();
         }
     }
 
     private TsdbQueryDto specialise(TsdbQueryDto queue, Era era, SubMetric metric) {
         TsdbQueryDto nova = queue.clone();
-        nova.metric = tsdb.metrics.getId(metric.name);
+        nova.metric = resolver.resolveMetric(metric.name);
         nova.metricText = metric.name;
         nova.start_time = Math.max(queue.start_time*1000, era.from);
         if (queue.end_time != null) {

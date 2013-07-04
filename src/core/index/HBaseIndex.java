@@ -1,24 +1,38 @@
-package net.opentsdb.core;
+package net.opentsdb.core.index;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.stumbleupon.async.Deferred;
-import net.opentsdb.core.model.Change;
-import net.opentsdb.core.model.FederatedMetric;
+import net.opentsdb.core.index.model.Change;
+import net.opentsdb.core.index.model.FederatedMetric;
 import org.hbase.async.*;
+import org.joda.time.DateTimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.Scanner;
 
 /**
  * @author rystsov
  * @date 6/25/13
  */
-public class FederatedMetricIndex {
-    public static final byte[] TSDB_INDEX_CF = "submetrics".getBytes();
-    public static final byte[] TSDB_INDEX_Q = "all".getBytes();
+public class HBaseIndex implements Index {
+    public static class Loader implements IndexLoader {
+        private final HBaseClient client;
+        private final byte[] indextable;
+
+        public Loader(HBaseClient client, byte[] indextable) {
+            this.client = client;
+            this.indextable = indextable;
+        }
+
+        @Override
+        public Index load() {
+            return HBaseIndex.load(client, indextable);
+        }
+    }
+
+    private static final byte[] TSDB_INDEX_CF = "submetrics".getBytes();
+    private static final byte[] TSDB_INDEX_Q = "all".getBytes();
 
     private static final short MAX_ATTEMPTS_PUT = 6;
     /**
@@ -26,32 +40,39 @@ public class FederatedMetricIndex {
      */
     private static final short INITIAL_EXP_BACKOFF_DELAY = 800;
 
-    private static final Logger LOG = LoggerFactory.getLogger(FederatedMetricIndex.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HBaseIndex.class);
+
+    private final HBaseClient client;
+    private final byte[] indextable;
 
 
+    private long loadedAt;
+    private Map<String, SortedSet<Change>> index;
+    private Map<String, FederatedMetric> head;
+    private HashSet<String> subMetricsIndex;
 
 
-    public final TSDB tsdb;
-    final byte[] indextable;
-
-    public long loadedAt;
-
-    public Map<String, SortedSet<Change>> index;
-    public Map<String, FederatedMetric> head;
-    public HashSet<String> subMetricsIndex;
-
-
-    public static FederatedMetricIndex load(final TSDB tsdb, final byte[] indextable) {
-        FederatedMetricIndex loaded = new FederatedMetricIndex(tsdb, indextable);
+    private static HBaseIndex load(final HBaseClient client, final byte[] indextable) {
+        HBaseIndex loaded = new HBaseIndex(client, indextable);
         loaded.index = loaded.scan();
         loaded.initSubMetricIndex();
         loaded.fillHead();
-        loaded.loadedAt = System.currentTimeMillis();
+        loaded.loadedAt = DateTimeUtils.currentTimeMillis();
         return loaded;
     }
 
+    @Override
+    public boolean isFederated(String name) {
+        return index.containsKey(name);
+    }
 
-    public void put(String metric, SortedSet<Change> changes) {
+    @Override
+    public FederatedMetric getFederatedMetric(String metric) {
+        return head.get(metric);
+    }
+
+    @Override
+    public void putChanges(String metric, SortedSet<Change> changes) {
         String json = new Gson().toJson(changes);
 
         putWithRetry(new PutRequest(
@@ -60,16 +81,23 @@ public class FederatedMetricIndex {
         ), MAX_ATTEMPTS_PUT, INITIAL_EXP_BACKOFF_DELAY);
     }
 
-    public SortedSet<Change> get(String name) {
+    @Override
+    public SortedSet<Change> getChanges(String name) {
         return index.containsKey(name) ? index.get(name) : null;
     }
 
+    @Override
     public Collection<FederatedMetric> list() {
         List<FederatedMetric> result = new ArrayList<FederatedMetric>();
         for (String key : index.keySet()) {
             result.add(FederatedMetric.create(key, index.get(key)));
         }
         return result;
+    }
+
+    @Override
+    public long snapshotTS() {
+        return loadedAt;
     }
 
 
@@ -99,15 +127,15 @@ public class FederatedMetricIndex {
     }
 
     private org.hbase.async.Scanner getScanner() throws HBaseException {
-        final org.hbase.async.Scanner scanner = tsdb.client.newScanner(indextable);
+        final org.hbase.async.Scanner scanner = client.newScanner(indextable);
         scanner.setFamily(TSDB_INDEX_CF);
         return scanner;
     }
 
 
 
-    private FederatedMetricIndex(final TSDB tsdb, final byte[] indextable) {
-        this.tsdb = tsdb;
+    private HBaseIndex(final HBaseClient client, final byte[] indextable) {
+        this.client = client;
         this.indextable = indextable;
     }
 
@@ -134,7 +162,7 @@ public class FederatedMetricIndex {
         put.setBufferable(false);  // TODO(tsuna): Remove once this code is async.
         while (attempts-- > 0) {
             try {
-                tsdb.client.put(put).joinUninterruptibly();
+                client.put(put).joinUninterruptibly();
                 return;
             } catch (HBaseException e) {
                 if (attempts > 0) {

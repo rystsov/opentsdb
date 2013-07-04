@@ -80,12 +80,15 @@ tsdb_SRC := \
 	src/core/TsdbQueryDtoBuilder.java	\
 	src/core/TsdbQueryLoader.java	\
 	src/core/TsdbQueryAggregator.java \
-	src/core/FederatedMetricEngine.java	\
-	src/core/FederatedMetricIndex.java	\
-	src/core/model/Change.java	\
-	src/core/model/Era.java	\
-	src/core/model/FederatedMetric.java	\
-	src/core/model/SubMetric.java
+	src/core/index/FederatedMetricEngine.java	\
+	src/core/index/Index.java	\
+	src/core/index/HBaseIndex.java	\
+	src/core/index/IndexLoader.java	\
+	src/core/index/IdResolver.java	\
+	src/core/index/model/Change.java	\
+	src/core/index/model/Era.java	\
+	src/core/index/model/FederatedMetric.java	\
+	src/core/index/model/SubMetric.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\

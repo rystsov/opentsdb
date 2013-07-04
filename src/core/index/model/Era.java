@@ -1,7 +1,5 @@
-package net.opentsdb.core.model;
+package net.opentsdb.core.index.model;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 

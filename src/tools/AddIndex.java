@@ -12,21 +12,15 @@
 // see <http://www.gnu.org/licenses/>.
 package net.opentsdb.tools;
 
-import net.opentsdb.core.FederatedMetricIndex;
+import net.opentsdb.core.index.HBaseIndex;
 import net.opentsdb.core.TSDB;
-import net.opentsdb.core.model.Change;
-import net.opentsdb.core.model.FederatedMetric;
-import net.opentsdb.core.model.SubMetric;
-import net.opentsdb.uid.NoSuchUniqueId;
-import net.opentsdb.uid.NoSuchUniqueName;
+import net.opentsdb.core.index.Index;
+import net.opentsdb.core.index.model.Change;
+import net.opentsdb.core.index.model.FederatedMetric;
+import net.opentsdb.core.index.model.SubMetric;
 import net.opentsdb.uid.UniqueId;
 import org.hbase.async.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.nio.charset.Charset;
 import java.util.*;
 
 /**
@@ -36,7 +30,7 @@ import java.util.*;
 final class AddIndex {
     final HBaseClient client;
     final TSDB tsdb;
-    final FederatedMetricIndex index;
+    final Index index;
     final String[] args;
     final short idwidth;
     final String uidtable;
@@ -62,7 +56,7 @@ final class AddIndex {
                                    : 3);
         client = CliOptions.clientFromOptions(argp);
         tsdb = new TSDB(client, table, uidtable, indextable, cacheTimeoutMs);
-        index = FederatedMetricIndex.load(tsdb, indextable.getBytes());
+        index = new HBaseIndex.Loader(client, indextable.getBytes()).load();
     }
 
     private void addOrRemove() {
@@ -72,7 +66,7 @@ final class AddIndex {
         final UniqueId uid = new UniqueId(client, uidtable.getBytes(), "metrics", (int) idwidth);
         uid.getOrCreateId(change.subMetricName(args[1]));
 
-        index.put(args[1], changes);
+        index.putChanges(args[1], changes);
     }
 
     private void list() {
@@ -88,7 +82,7 @@ final class AddIndex {
     }
 
     private SortedSet<Change> enrich(Change change) {
-        SortedSet<Change> changes = index.get(args[1]);
+        SortedSet<Change> changes = index.getChanges(args[1]);
         changes = changes==null ? new TreeSet<Change>() : new TreeSet<Change>(changes);
         changes.add(change);
 

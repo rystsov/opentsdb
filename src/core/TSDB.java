@@ -21,6 +21,9 @@ import com.stumbleupon.async.Callback;
 import com.stumbleupon.async.Deferred;
 import com.stumbleupon.async.DeferredGroupException;
 
+import net.opentsdb.core.index.FederatedMetricEngine;
+import net.opentsdb.core.index.HBaseIndex;
+import net.opentsdb.core.index.IdResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +111,7 @@ public final class TSDB {
     compactionq = new CompactionQueue(this);
 
     final byte[] indextable = index_table.getBytes();
-    federatedMetrics = new FederatedMetricEngine(this, indextable, cacheTimeoutMs);
+    federatedMetrics = new FederatedMetricEngine(new HBaseIndex.Loader(client, indextable), this.asIdResolver(), cacheTimeoutMs);
   }
 
   public List<TsdbQueryDto> splitIfFederated(TsdbQueryDto query) {
@@ -119,6 +122,14 @@ public final class TSDB {
     return federatedMetrics.tryMapMetricToSubMetric(metric, tags);
   }
 
+  public IdResolver asIdResolver() {
+      return new IdResolver() {
+          @Override
+          public byte[] resolveMetric(String metric) {
+              return TSDB.this.metrics.getId(metric);
+          }
+      };
+  }
 
   /** Number of cache hits during lookups involving UIDs. */
   public int uidCacheHits() {

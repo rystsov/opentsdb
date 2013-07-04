@@ -1,7 +1,6 @@
-package net.opentsdb.core.model;
+package net.opentsdb.core.index.model;
 
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**

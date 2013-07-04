@@ -1,6 +1,4 @@
-package net.opentsdb.core.model;
-
-import net.opentsdb.core.FederatedMetricIndex;
+package net.opentsdb.core.index.model;
 
 import java.util.*;
 

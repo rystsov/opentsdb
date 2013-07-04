@@ -1,4 +1,4 @@
-package net.opentsdb.core.model;
+package net.opentsdb.core.index.model;
 
 import java.util.Collections;
 import java.util.HashMap;
