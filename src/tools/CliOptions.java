@@ -40,6 +40,10 @@ final class CliOptions {
     argp.addOption("--indextable", "TABLE",
                    "Name of the HBase table to use for index"
                    + " (default: tsdb-index).");
+    // TODO: change default from 1000
+    argp.addOption("--cache-timeout-ms", "LONG",
+                   "cache-timeout-ms"
+                   + " (default: 1000).");
     argp.addOption("--zkquorum", "SPEC",
                    "Specification of the ZooKeeper quorum to use"
                    + " (default: localhost).");

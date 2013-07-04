@@ -43,7 +43,6 @@ import net.opentsdb.core.Aggregators;
 import net.opentsdb.core.Const;
 import net.opentsdb.core.DataPoint;
 import net.opentsdb.core.DataPoints;
-import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
 import net.opentsdb.core.Tags;
 import net.opentsdb.core.TsdbQueryDtoBuilder;

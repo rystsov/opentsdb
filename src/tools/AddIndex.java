@@ -60,7 +60,6 @@ final class AddIndex {
         idwidth = (argp.has("--idwidth")
                                    ? Short.parseShort(argp.get("--idwidth"))
                                    : 3);
-
         client = CliOptions.clientFromOptions(argp);
         tsdb = new TSDB(client, table, uidtable, indextable, cacheTimeoutMs);
         index = FederatedMetricIndex.load(tsdb, indextable.getBytes());
