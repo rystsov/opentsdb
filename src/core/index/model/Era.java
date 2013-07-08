@@ -33,9 +33,12 @@ public class Era implements Comparable<Era> {
         return eras;
     }
 
-    public static SortedSet<Era> filter(SortedSet<Era> items, long from, Long to, long cacheTimeOut) {
+    public static Era[] filter(Era[] items, long from, Long to, long cacheTimeOut) {
         SortedSet<Era> refined = new TreeSet<Era>();
+        long last = Long.MIN_VALUE;
         for (Era item : items) {
+            if (last>item.from) throw new RuntimeException();
+            last = item.from;
             if (to==null) {
                 if (item.to!=null) {
                     if (item.to < from - 2*cacheTimeOut) continue;
@@ -48,7 +51,7 @@ public class Era implements Comparable<Era> {
             }
             refined.add(item);
         }
-        return refined;
+        return refined.toArray(new Era[0]);
     }
 
     @Override

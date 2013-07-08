@@ -51,6 +51,13 @@ public final class TSDB {
   static final byte[] FAMILY = { 't' };
   static final Histogram scanlatency = new Histogram(16000, (short) 2, 100);
 
+  /**
+   * Keep track of the latency (in ms) we perceive sending edits to HBase.
+   * We want buckets up to 16s, with 2 ms interval between each bucket up to
+   * 100 ms after we which we switch to exponential buckets.
+   */
+  static final Histogram putlatency = new Histogram(16000, (short) 2, 100);
+
   public static final String METRICS_QUAL = "metrics";
   public static final short METRICS_WIDTH = 3;
   public static final String TAG_NAME_QUAL = "tagk";
@@ -119,8 +126,8 @@ public final class TSDB {
     return federatedMetrics.split(query);
   }
 
-  public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
-    return federatedMetrics.tryMapMetricToSubMetric(metric, tags);
+  public String tryMapMetricToSubMetric(String metric, long timestampMs, Map<String, String> tags) {
+    return federatedMetrics.tryMapMetricToSubMetric(metric, timestampMs, tags);
   }
 
   public IdResolver asIdResolver() {
@@ -173,7 +180,7 @@ public final class TSDB {
 
     collector.addExtraTag("class", "IncomingDataPoints");
     try {
-      collector.record("hbase.latency", IncomingDataPoints.putlatency, "method=put");
+      collector.record("hbase.latency", putlatency, "method=put");
     } finally {
       collector.clearExtraTag("class");
     }
@@ -210,7 +217,7 @@ public final class TSDB {
 
   /** Returns a latency histogram for Put RPCs used to store data points. */
   public Histogram getPutLatencyHistogram() {
-    return IncomingDataPoints.putlatency;
+    return putlatency;
   }
 
   /** Returns a latency histogram for Scan RPCs used to fetch data points.  */
@@ -234,14 +241,15 @@ public final class TSDB {
     return new TsdbQueryDtoBuilder(this);
   }
 
+
   /**
    * Returns a new {@link WritableDataPoints} instance suitable for this TSDB.
    * <p>
    * If you want to add a single data-point, consider using {@link #addPoint}
    * instead.
    */
-  public WritableDataPoints newDataPoints() {
-    return new IncomingDataPoints(this);
+  public WritableDataPointsLight newDataPoints() {
+    return new IncomingTimeShardedDataPoints(this);
   }
 
   /**
@@ -322,9 +330,9 @@ public final class TSDB {
           + " to metric=" + metric + ", tags=" + tags);
     }
 
-    metric = tryMapMetricToSubMetric(metric, tags);
-    IncomingDataPoints.checkMetricAndTags(metric, tags);
-    final byte[] row = IncomingDataPoints.rowKeyTemplate(this, metric, tags);
+    metric = tryMapMetricToSubMetric(metric, timestamp*1000, tags);
+    RowKey.checkMetricAndTags(metric, tags);
+    final byte[] row = RowKey.rowKeyTemplate(this, metric, tags);
     final long base_time = (timestamp - (timestamp % Const.MAX_TIMESPAN));
     Bytes.setInt(row, (int) base_time, metrics.width());
     scheduleForCompaction(row, (int) base_time);

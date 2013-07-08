@@ -2,6 +2,7 @@ package net.opentsdb.core.index;
 
 import net.opentsdb.core.TsdbQueryDto;
 import net.opentsdb.core.index.model.Era;
+import net.opentsdb.core.index.model.FederatedMetric;
 import net.opentsdb.core.index.model.SubMetric;
 import org.joda.time.DateTimeUtils;
 import org.slf4j.Logger;
@@ -38,7 +39,7 @@ public class FederatedMetricEngine {
 
         List<TsdbQueryDto> result = new ArrayList<TsdbQueryDto>();
         if (local.isFederated(query.metricText)) {
-            SortedSet<Era> eras = Era.build(query.metricText, local.getChanges(query.metricText));
+            Era[] eras = local.getAscEra(query.metricText);
             eras = Era.filter(eras, query.start_time*1000, query.end_time==null?null:query.end_time*1000, cacheTimeoutMs);
 
             for (Era era : eras) {
@@ -78,23 +79,34 @@ public class FederatedMetricEngine {
         return name.contains("/");
     }
 
-    public String tryMapMetricToSubMetric(String metric, Map<String, String> tags) {
+    public String tryMapMetricToSubMetric(String metric, long timestampMs, Map<String, String> tags) {
         checkUpdateOutdatedCache();
         Index local = this.index;
 
         if (!local.isFederated(metric)) return metric;
+
+        Era[] eras = local.getAscEra(metric);
+
+        FederatedMetric federatedMetric = null;
+        for (int i=eras.length-1;i>=0;i--) {
+            if (eras[i].from<=timestampMs) {
+                federatedMetric = eras[i].metric;
+                break;
+            }
+        }
+        if (federatedMetric==null) return metric;
+
         SubMetric subMetric = null;
-        for (SubMetric item : local.getFederatedMetric(metric).subMetrics) {
+        for (SubMetric item : federatedMetric.subMetrics) {
             if (item.isMatch(tags)) {
                 subMetric = item;
                 break;
             }
         }
-        if (subMetric!=null) {
-            LOG.info("Remap " + metric + " to " + subMetric.name);
-            metric = subMetric.name;
-        }
-        return metric;
+        if (subMetric==null) return metric;
+
+        LOG.info("Remap " + metric + " to " + subMetric.name);
+        return subMetric.name;
     }
 
     private synchronized void checkUpdateOutdatedCache() {
@@ -147,7 +159,7 @@ public class FederatedMetricEngine {
         }
     }
 
-    public static List<TsdbQueryDto> dedupAll(List<TsdbQueryDto> queries) {
+    private static List<TsdbQueryDto> dedupAll(List<TsdbQueryDto> queries) {
         Map<String, List<TsdbQueryDto>> grouped = new HashMap<String, List<TsdbQueryDto>>();
         for (TsdbQueryDto query : queries) {
             if (!grouped.containsKey(query.metricText)) {
@@ -162,7 +174,7 @@ public class FederatedMetricEngine {
         return result;
     }
 
-    public static List<TsdbQueryDto> dedupTrack(List<TsdbQueryDto> queries) {
+    private static List<TsdbQueryDto> dedupTrack(List<TsdbQueryDto> queries) {
         String metric = null;
         SortedMap<Long, List<Par>> openClosePar = new TreeMap<Long, List<Par>>();
         for(TsdbQueryDto query : queries) {

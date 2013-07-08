@@ -23,6 +23,7 @@ import java.util.zip.GZIPInputStream;
 import com.stumbleupon.async.Callback;
 import com.stumbleupon.async.Deferred;
 
+import net.opentsdb.core.WritableDataPointsLight;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +151,7 @@ final class TextImporter {
             Tags.parse(tags, words[i]);
           }
         }
-        final WritableDataPoints dp = getDataPoints(tsdb, metric, tags);
+        final WritableDataPointsLight dp = getDataPoints(tsdb, metric, tags);
         Deferred<Object> d;
         if (Tags.looksLikeInteger(value)) {
           d = dp.addPoint(timestamp, Tags.parseLong(value));
@@ -214,15 +215,14 @@ final class TextImporter {
     return new BufferedReader(new InputStreamReader(is));
   }
 
-  private static final HashMap<String, WritableDataPoints> datapoints =
-    new HashMap<String, WritableDataPoints>();
+  private static final HashMap<String, WritableDataPointsLight> datapoints =
+    new HashMap<String, WritableDataPointsLight>();
 
-  private static
-    WritableDataPoints getDataPoints(final TSDB tsdb,
+  private static WritableDataPointsLight getDataPoints(final TSDB tsdb,
                                      final String metric,
                                      final HashMap<String, String> tags) {
     final String key = metric + tags;
-    WritableDataPoints dp = datapoints.get(key);
+      WritableDataPointsLight dp = datapoints.get(key);
     if (dp != null) {
       return dp;
     }

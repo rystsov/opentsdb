@@ -1,6 +1,7 @@
 package net.opentsdb.core.index;
 
 import net.opentsdb.core.index.model.Change;
+import net.opentsdb.core.index.model.Era;
 import net.opentsdb.core.index.model.FederatedMetric;
 
 import java.util.Collection;
@@ -17,6 +18,8 @@ public interface Index {
     FederatedMetric getFederatedMetric(String metric);
 
     SortedSet<Change> getChanges(String name);
+
+    Era[] getAscEra(String name);
 
     Collection<FederatedMetric> list();
 

@@ -55,7 +55,7 @@ public class TestBase {
 
     protected void addMeasure(String metric, long time, long value, String tags) {
         Map<String, String> parsedTag = parseTags(tags);
-        metric = engine.tryMapMetricToSubMetric(metric, parsedTag);
+        metric = engine.tryMapMetricToSubMetric(metric, time, parsedTag);
         tsdb.put(metric, time, value, parsedTag);
     }
 

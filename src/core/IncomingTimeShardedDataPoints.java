@@ -1,48 +1,70 @@
-// This file is part of OpenTSDB.
-// Copyright (C) 2010-2012  The OpenTSDB Authors.
-//
-// This program is free software: you can redistribute it and/or modify it
-// under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 2.1 of the License, or (at your
-// option) any later version.  This program is distributed in the hope that it
-// will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-// of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
-// General Public License for more details.  You should have received a copy
-// of the GNU Lesser General Public License along with this program.  If not,
-// see <http://www.gnu.org/licenses/>.
 package net.opentsdb.core;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
 import com.stumbleupon.async.Deferred;
-
 import org.hbase.async.Bytes;
 import org.hbase.async.PutRequest;
 
-import net.opentsdb.stats.Histogram;
+import java.util.*;
+
+/**
+ * @author rystsov
+ * @date 7/8/13
+ */
+public class IncomingTimeShardedDataPoints implements WritableDataPointsLight {
+    private String metric = null;
+    private Map<String, String> tags = null;
+    private Boolean batchornot = null;
+
+    private Map<String, IncomingDataPoints> shards = new HashMap<String, IncomingDataPoints>();
+    private final TSDB tsdb;
+
+    public IncomingTimeShardedDataPoints(TSDB tsdb) {
+        this.tsdb = tsdb;
+    }
+
+    @Override
+    public Deferred<Object> addPoint(long timestamp, long value) {
+        return getShard(timestamp).addPoint(timestamp, value);
+    }
+
+    @Override
+    public Deferred<Object> addPoint(long timestamp, float value) {
+        return getShard(timestamp).addPoint(timestamp, value);
+    }
+
+    @Override
+    public void setSeries(String metric, Map<String, String> tags) {
+        if (metric==null) throw new IllegalArgumentException("metric can't be null");
+        if (tags==null) throw new IllegalArgumentException("tags can't be null");
+        if (this.metric!=null) throw new IllegalArgumentException("metric can't be set twice");
+        this.metric = metric;
+        this.tags = tags;
+    }
+
+    @Override
+    public void setBatchImport(boolean batchornot) {
+        if (this.batchornot!=null) throw new IllegalArgumentException("batchornot can't be set twice");
+        this.batchornot = batchornot;
+    }
+
+    private IncomingDataPoints getShard(long timestamp) {
+        String submetric = tsdb.tryMapMetricToSubMetric(metric, timestamp*1000, tags);
+        if (!shards.containsKey(submetric)) {
+            IncomingDataPoints income = new IncomingDataPoints(tsdb);
+            income.setSeries(submetric, tags);
+            income.setBatchImport(batchornot==null ? false : batchornot);
+            shards.put(submetric, income);
+        }
+        return shards.get(submetric);
+    }
+
 
 /**
  * Receives new data points and stores them in HBase.
  */
-final class IncomingDataPoints implements WritableDataPoints {
-
-  /** For auto create metrics mode, set by --auto-metric flag in TSDMain.  */
-  private static final boolean AUTO_METRIC =
-    System.getProperty("tsd.core.auto_create_metrics") != null;
-
+final private static class IncomingDataPoints {
   /** For how long to buffer edits when doing batch imports (in ms).  */
   private static final short DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL = 5000;
-
-  /**
-   * Keep track of the latency (in ms) we perceive sending edits to HBase.
-   * We want buckets up to 16s, with 2 ms interval between each bucket up to
-   * 100 ms after we which we switch to exponential buckets.
-   */
-  static final Histogram putlatency = new Histogram(16000, (short) 2, 100);
 
   /** The {@code TSDB} instance we belong to. */
   private final TSDB tsdb;
@@ -76,80 +98,55 @@ final class IncomingDataPoints implements WritableDataPoints {
    * Constructor.
    * @param tsdb The TSDB we belong to.
    */
-  IncomingDataPoints(final TSDB tsdb) {
+  public IncomingDataPoints(final TSDB tsdb) {
     this.tsdb = tsdb;
     this.qualifiers = new short[3];
     this.values = new long[3];
   }
 
-  /**
-   * Validates the given metric and tags.
-   * @throws IllegalArgumentException if any of the arguments aren't valid.
-   */
-  static void checkMetricAndTags(final String metric, final Map<String, String> tags) {
-    if (tags.size() <= 0) {
-      throw new IllegalArgumentException("Need at least one tags (metric="
-          + metric + ", tags=" + tags + ')');
-    } else if (tags.size() > Const.MAX_NUM_TAGS) {
-      throw new IllegalArgumentException("Too many tags: " + tags.size()
-          + " maximum allowed: " + Const.MAX_NUM_TAGS + ", tags: " + tags);
-    }
-
-    Tags.validateString("metric name", metric);
-    for (final Map.Entry<String, String> tag : tags.entrySet()) {
-      Tags.validateString("tag name", tag.getKey());
-      Tags.validateString("tag value", tag.getValue());
-    }
-  }
-
-  /**
-   * Returns a partially initialized row key for this metric and these tags.
-   * The only thing left to fill in is the base timestamp.
-   */
-  static byte[] rowKeyTemplate(final TSDB tsdb,
-                               final String metric,
-                               final Map<String, String> tags) {
-    final short metric_width = tsdb.metrics.width();
-    final short tag_name_width = tsdb.tag_names.width();
-    final short tag_value_width = tsdb.tag_values.width();
-    final short num_tags = (short) tags.size();
-
-    int row_size = (metric_width + Const.TIMESTAMP_BYTES
-                    + tag_name_width * num_tags
-                    + tag_value_width * num_tags);
-    final byte[] row = new byte[row_size];
-
-    short pos = 0;
-
-    copyInRowKey(row, pos, (AUTO_METRIC ? tsdb.metrics.getOrCreateId(metric)
-                       : tsdb.metrics.getId(metric)));
-    pos += metric_width;
-
-    pos += Const.TIMESTAMP_BYTES;
-
-    for(final byte[] tag : Tags.resolveOrCreateAll(tsdb, tags)) {
-      copyInRowKey(row, pos, tag);
-      pos += tag.length;
-    }
-    return row;
-  }
-
   public void setSeries(String metric, final Map<String, String> tags) {
-    metric = tsdb.tryMapMetricToSubMetric(metric, tags);
-    checkMetricAndTags(metric, tags);
-    row = rowKeyTemplate(tsdb, metric, tags);
+    RowKey.checkMetricAndTags(metric, tags);
+    row = RowKey.rowKeyTemplate(tsdb, metric, tags);
     size = 0;
   }
 
-  /**
-   * Copies the specified byte array at the specified offset in the row key.
-   * @param row The row key into which to copy the bytes.
-   * @param offset The offset in the row key to start writing at.
-   * @param bytes The bytes to copy.
-   */
-  private static void copyInRowKey(final byte[] row, final short offset, final byte[] bytes) {
-    System.arraycopy(bytes, 0, row, offset, bytes.length);
+  public Deferred<Object> addPoint(final long timestamp, final long value) {
+    final short flags = 0x7;  // An int stored on 8 bytes.
+    return addPointInternal(timestamp, Bytes.fromLong(value), flags);
   }
+
+  public Deferred<Object> addPoint(final long timestamp, final float value) {
+    if (Float.isNaN(value) || Float.isInfinite(value)) {
+      throw new IllegalArgumentException("value is NaN or Infinite: " + value
+                                         + " for timestamp=" + timestamp);
+    }
+    final short flags = Const.FLAG_FLOAT | 0x3;  // A float stored on 4 bytes.
+    return addPointInternal(timestamp,
+                            Bytes.fromInt(Float.floatToRawIntBits(value)),
+                            flags);
+  }
+
+  public void setBatchImport(final boolean batchornot) {
+    if (batch_import == batchornot) {
+      return;
+    }
+    final long current_interval = tsdb.client.getFlushInterval();
+    if (batchornot) {
+      batch_import = true;
+      // If we already were given a larger interval, don't override it.
+      if (DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL > current_interval) {
+        setBufferingTime(DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL);
+      }
+    } else {
+      batch_import = false;
+      // If we're using the default batch import buffer interval,
+      // revert back to 0.
+      if (current_interval == DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL) {
+        setBufferingTime((short) 0);
+      }
+    }
+  }
+
 
   /**
    * Updates the base time in the row key.
@@ -270,118 +267,11 @@ final class IncomingDataPoints implements WritableDataPoints {
     return Bytes.getUnsignedInt(row, tsdb.metrics.width());
   }
 
-  public Deferred<Object> addPoint(final long timestamp, final long value) {
-    final short flags = 0x7;  // An int stored on 8 bytes.
-    return addPointInternal(timestamp, Bytes.fromLong(value), flags);
-  }
-
-  public Deferred<Object> addPoint(final long timestamp, final float value) {
-    if (Float.isNaN(value) || Float.isInfinite(value)) {
-      throw new IllegalArgumentException("value is NaN or Infinite: " + value
-                                         + " for timestamp=" + timestamp);
-    }
-    final short flags = Const.FLAG_FLOAT | 0x3;  // A float stored on 4 bytes.
-    return addPointInternal(timestamp,
-                            Bytes.fromInt(Float.floatToRawIntBits(value)),
-                            flags);
-  }
-
-  public void setBufferingTime(final short time) {
+  private void setBufferingTime(final short time) {
     if (time < 0) {
       throw new IllegalArgumentException("negative time: " + time);
     }
     tsdb.client.setFlushInterval(time);
-  }
-
-  public void setBatchImport(final boolean batchornot) {
-    if (batch_import == batchornot) {
-      return;
-    }
-    final long current_interval = tsdb.client.getFlushInterval();
-    if (batchornot) {
-      batch_import = true;
-      // If we already were given a larger interval, don't override it.
-      if (DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL > current_interval) {
-        setBufferingTime(DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL);
-      }
-    } else {
-      batch_import = false;
-      // If we're using the default batch import buffer interval,
-      // revert back to 0.
-      if (current_interval == DEFAULT_BATCH_IMPORT_BUFFER_INTERVAL) {
-        setBufferingTime((short) 0);
-      }
-    }
-  }
-
-  public String metricName() {
-    if (row == null) {
-      throw new IllegalStateException("setSeries never called before!");
-    }
-    final byte[] id = Arrays.copyOfRange(row, 0, tsdb.metrics.width());
-    return tsdb.metrics.getName(id);
-  }
-
-  public Map<String, String> getTags() {
-    return Tags.getTags(tsdb, row);
-  }
-
-  public List<String> getAggregatedTags() {
-    return Collections.emptyList();
-  }
-
-  public int size() {
-    return size;
-  }
-
-  public int aggregatedSize() {
-    return 0;
-  }
-
-  public SeekableView iterator() {
-    return new DataPointsIterator(this);
-  }
-
-  /** @throws IndexOutOfBoundsException if {@code i} is out of bounds. */
-  private void checkIndex(final int i) {
-    if (i > size) {
-      throw new IndexOutOfBoundsException("index " + i + " > " + size
-          + " for this=" + this);
-    }
-    if (i < 0) {
-      throw new IndexOutOfBoundsException("negative index " + i
-          + " for this=" + this);
-    }
-  }
-
-  private static short delta(final short qualifier) {
-    return (short) ((qualifier & 0xFFFF) >>> Const.FLAG_BITS);
-  }
-
-  public long timestamp(final int i) {
-    checkIndex(i);
-    return baseTime() + (delta(qualifiers[i]) & 0xFFFF);
-  }
-
-  public boolean isInteger(final int i) {
-    checkIndex(i);
-    return (qualifiers[i] & Const.FLAG_FLOAT) == 0x0;
-  }
-
-  public long longValue(final int i) {
-    // Don't call checkIndex(i) because isInteger(i) already calls it.
-    if (isInteger(i)) {
-      return values[i];
-    }
-    throw new ClassCastException("value #" + i + " is not a long in " + this);
-  }
-
-  public double doubleValue(final int i) {
-    // Don't call checkIndex(i) because isInteger(i) already calls it.
-    if (!isInteger(i)) {
-      return Float.intBitsToFloat((int) values[i]);
-    }
-    throw new ClassCastException("value #" + i + " is not a float in " + this);
   }
 
   /** Returns a human readable string representation of the object. */
@@ -416,5 +306,57 @@ final class IncomingDataPoints implements WritableDataPoints {
     buf.append("])");
     return buf.toString();
   }
+
+    private String metricName() {
+      if (row == null) {
+        throw new IllegalStateException("setSeries never called before!");
+      }
+      final byte[] id = Arrays.copyOfRange(row, 0, tsdb.metrics.width());
+      return tsdb.metrics.getName(id);
+    }
+
+    /** @throws IndexOutOfBoundsException if {@code i} is out of bounds. */
+    private void checkIndex(final int i) {
+      if (i > size) {
+        throw new IndexOutOfBoundsException("index " + i + " > " + size
+            + " for this=" + this);
+      }
+      if (i < 0) {
+        throw new IndexOutOfBoundsException("negative index " + i
+            + " for this=" + this);
+      }
+    }
+
+    private static short delta(final short qualifier) {
+      return (short) ((qualifier & 0xFFFF) >>> Const.FLAG_BITS);
+    }
+
+    private long timestamp(final int i) {
+      checkIndex(i);
+      return baseTime() + (delta(qualifiers[i]) & 0xFFFF);
+    }
+
+    private boolean isInteger(final int i) {
+      checkIndex(i);
+      return (qualifiers[i] & Const.FLAG_FLOAT) == 0x0;
+    }
+
+    private long longValue(final int i) {
+      // Don't call checkIndex(i) because isInteger(i) already calls it.
+      if (isInteger(i)) {
+        return values[i];
+      }
+      throw new ClassCastException("value #" + i + " is not a long in " + this);
+    }
+
+    private double doubleValue(final int i) {
+      // Don't call checkIndex(i) because isInteger(i) already calls it.
+      if (!isInteger(i)) {
+        return Float.intBitsToFloat((int) values[i]);
+      }
+      throw new ClassCastException("value #" + i + " is not a float in " + this);
+    }
+}
+
 
 }

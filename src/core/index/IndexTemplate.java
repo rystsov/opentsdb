@@ -3,6 +3,7 @@ package net.opentsdb.core.index;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.opentsdb.core.index.model.Change;
+import net.opentsdb.core.index.model.Era;
 import net.opentsdb.core.index.model.FederatedMetric;
 import org.hbase.async.HBaseClient;
 import org.hbase.async.HBaseException;
@@ -26,6 +27,7 @@ public abstract class IndexTemplate implements Index {
     protected long loadedAt;
     protected Map<String, SortedSet<Change>> index;
     protected Map<String, FederatedMetric> head;
+    protected Map<String, Era[]> eras;
 
     protected IndexTemplate(final IdResolver resolver) {
         this.resolver = resolver;
@@ -34,12 +36,18 @@ public abstract class IndexTemplate implements Index {
     protected void load() {
         index = scan();
         fillHead();
+        fillEras();
         loadedAt = DateTimeUtils.currentTimeMillis();
     }
 
     @Override
     public boolean isFederated(String name) {
         return index.containsKey(name);
+    }
+
+    @Override
+    public Era[] getAscEra(String name) {
+        return eras.get(name);
     }
 
     @Override
@@ -98,6 +106,13 @@ public abstract class IndexTemplate implements Index {
         head = new HashMap<String, FederatedMetric>();
         for (String key : index.keySet()) {
             head.put(key, FederatedMetric.create(key, index.get(key)));
+        }
+    }
+
+    protected void fillEras() {
+        eras = new HashMap<String, Era[]>();
+        for (String key : index.keySet()) {
+            eras.put(key, Era.build(key, getChanges(key)).toArray(new Era[0]));
         }
     }
 

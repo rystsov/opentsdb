@@ -52,7 +52,7 @@ public class TestFederatedMetricSplit extends TestBase {
         index.addIndex(metric, parseTags("cluster=a"));
         FederatedMetricEngine concurrent = new FederatedMetricEngine(loader, tsdb, dt);
         HashMap<String, String> tags = parseTags("cluster=a");
-        String submetric = concurrent.tryMapMetricToSubMetric(metric, tags);
+        String submetric = concurrent.tryMapMetricToSubMetric(metric, now, tags);
         Assert.assertNotEquals(metric, submetric);
 
         addMeasure(submetric, now, 2, "cluster=a host=local");
@@ -78,7 +78,7 @@ public class TestFederatedMetricSplit extends TestBase {
         index.addIndex(metric, parseTags("cluster=a"));
         FederatedMetricEngine concurrent = new FederatedMetricEngine(loader, tsdb, dt);
         HashMap<String, String> tags = parseTags("cluster=a");
-        String submetric = concurrent.tryMapMetricToSubMetric(metric, tags);
+        String submetric = concurrent.tryMapMetricToSubMetric(metric, now, tags);
         Assert.assertNotEquals(metric, submetric);
 
         addMeasure(submetric, now, 2, "cluster=a host=local");
@@ -104,13 +104,13 @@ public class TestFederatedMetricSplit extends TestBase {
         Index index = loader.load();
         index.addIndex(metric, parseTags("cluster=a"));
         HashMap<String, String> tags = parseTags("cluster=a");
-        String submetric = engine.tryMapMetricToSubMetric(metric, tags);
+        String submetric = engine.tryMapMetricToSubMetric(metric, now, tags);
         Assert.assertEquals(metric, submetric);
         addMeasure(submetric, now, 2, "cluster=a host=local");
         incTime(dt);
 
         tags = parseTags("cluster=a");
-        submetric = engine.tryMapMetricToSubMetric(metric, tags);
+        submetric = engine.tryMapMetricToSubMetric(metric, now, tags);
         Assert.assertNotEquals(metric, submetric);
         addMeasure(submetric, now, 3, "cluster=a host=local");
         incTime(1000);
@@ -151,7 +151,7 @@ public class TestFederatedMetricSplit extends TestBase {
                 tags.add("host=local cluster=b");
             }
             tagsP = (tagsP + 1) % tags.size();
-            String submetric = engine.tryMapMetricToSubMetric(metric, parseTags(tags.get(tagsP)));
+            String submetric = engine.tryMapMetricToSubMetric(metric, now, parseTags(tags.get(tagsP)));
             addMeasure(submetric, now, value, tags.get(tagsP));
             values.add(new MemoryTSDB.Measure(now + dt, value, parseTags(tags.get(tagsP))));
 

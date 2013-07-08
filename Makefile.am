@@ -35,7 +35,7 @@ tsdb_SRC := \
 	src/core/DataPoint.java	\
 	src/core/DataPoints.java	\
 	src/core/DataPointsIterator.java	\
-	src/core/IncomingDataPoints.java	\
+	src/core/IncomingTimeShardedDataPoints.java	\
 	src/core/IllegalDataException.java	\
 	src/core/Internal.java	\
 	src/core/RowKey.java	\
@@ -46,6 +46,7 @@ tsdb_SRC := \
 	src/core/TSDB.java	\
 	src/core/Tags.java	\
 	src/core/WritableDataPoints.java	\
+	src/core/WritableDataPointsLight.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\
