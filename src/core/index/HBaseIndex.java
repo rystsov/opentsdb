@@ -53,7 +53,28 @@ public class HBaseIndex extends IndexTemplate {
 
     @Override
     protected Map<String, SortedSet<Change>> scan() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        Map<String, SortedSet<Change>> metrics = new HashMap<String, SortedSet<Change>>();
+        final org.hbase.async.Scanner scanner = getScanner();
+        ArrayList<ArrayList<KeyValue>> rows;
+        try {
+            while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
+                for (final ArrayList<KeyValue> row : rows) {
+                    if (row.size()!=1) throw new RuntimeException("Corrupted index");
+
+                    List<Change> changes = new Gson().fromJson(
+                        new String(row.get(0).value()),
+                        new TypeToken<List<Change>>() {}.getType()
+                    );
+
+                    metrics.put(
+                            new String(row.get(0).key()),
+                            new TreeSet<Change>(changes));
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return metrics;
     }
 
     @Override
@@ -64,6 +85,12 @@ public class HBaseIndex extends IndexTemplate {
                         indextable, metric.getBytes(),
                         TSDB_INDEX_CF, TSDB_INDEX_Q, json.getBytes()
         ), MAX_ATTEMPTS_PUT, INITIAL_EXP_BACKOFF_DELAY);
+    }
+
+    private org.hbase.async.Scanner getScanner() throws HBaseException {
+        final org.hbase.async.Scanner scanner = client.newScanner(indextable);
+        scanner.setFamily(TSDB_INDEX_CF);
+        return scanner;
     }
 
     private void putWithRetry(final PutRequest put, short attempts, short wait) throws HBaseException {
