@@ -86,7 +86,7 @@ tsdb_SRC := \
 	src/core/index/HBaseIndex.java	\
 	src/core/index/IndexLoader.java	\
 	src/core/index/IdResolver.java	\
-	src/core/index/IndexTemplate	\
+	src/core/index/IndexTemplate.java	\
 	src/core/index/model/Change.java	\
 	src/core/index/model/Era.java	\
 	src/core/index/model/FederatedMetric.java	\
