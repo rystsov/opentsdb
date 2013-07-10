@@ -62,6 +62,11 @@ final class RowSeq implements DataPoints {
     this.tsdb = tsdb;
   }
 
+  public void substituteMetric(byte[] metric) {
+    if (tsdb.metrics.width()!=metric.length) throw new RuntimeException();
+    System.arraycopy(metric, 0, key, 0, metric.length);
+  }
+
   /**
    * Sets the row this instance holds in RAM using a row from a scanner.
    * @param row The compacted HBase row to set.

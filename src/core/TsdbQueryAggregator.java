@@ -63,7 +63,7 @@ public final class TsdbQueryAggregator {
         TsdbQueryLoader loader = new TsdbQueryLoader(tsdb);
         List<TsdbQueryDto> splitted = tsdb.splitIfFederated(query);
         for (TsdbQueryDto subQuery : splitted) {
-            groupByAndAggregate(subQuery, loader.findSpans(subQuery));
+            groupByAndAggregate(query, subQuery, loader.findSpans(subQuery));
         }
         return groups.values().toArray(new SpanGroup[groups.size()]);
     }
@@ -77,7 +77,7 @@ public final class TsdbQueryAggregator {
      * @return A possibly empty array of {@link net.opentsdb.core.SpanGroup}s built according to
      *         any 'GROUP BY' formulated in this query.
      */
-    private void groupByAndAggregate(TsdbQueryDto query, final TreeMap<byte[], Span> spans) {
+    private void groupByAndAggregate(TsdbQueryDto rootQuery, TsdbQueryDto query, final TreeMap<byte[], Span> spans) {
         if (spans == null || spans.size() <= 0) return;
         final byte[] key = query.group_bys == null ? empty : new byte[query.group_bys.size() * value_width];
 
@@ -94,7 +94,9 @@ public final class TsdbQueryAggregator {
                 thegroup = newGroup(query);
                 groups.put(Arrays.copyOf(key, key.length), thegroup);
             }
-            thegroup.add(entry.getValue());
+            Span span = entry.getValue();
+            span.substituteMetric(rootQuery.metric);
+            thegroup.add(span);
         }
     }
 

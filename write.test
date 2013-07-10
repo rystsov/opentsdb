@@ -1,6 +1,6 @@
 set -e
 
-metric=gg
+metric=ggg
 
 ./build/tsdb mkmetric $metric
 

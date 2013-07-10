@@ -44,6 +44,12 @@ final class Span implements DataPoints {
     this.tsdb = tsdb;
   }
 
+  public void substituteMetric(byte[] metric) {
+    for (RowSeq row : rows) {
+      row.substituteMetric(metric);
+    }
+  }
+
   private void checkNotEmpty() {
     if (rows.size() == 0) {
       throw new IllegalStateException("empty Span");
