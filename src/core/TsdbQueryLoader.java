@@ -81,6 +81,17 @@ public final class TsdbQueryLoader {
         this.tsdb = tsdb;
     }
 
+    public static class Response {
+        public final TreeMap<byte[], Span> data;
+        // milliseconds
+        public final long hbaseTs;
+
+        public Response(TreeMap<byte[], Span> data, long hbaseTs) {
+            this.data = data;
+            this.hbaseTs = hbaseTs;
+        }
+    }
+
     /**
      * Finds all the {@link net.opentsdb.core.Span}s that match this query.
      * This is what actually scans the HBase table and loads the data into
@@ -93,7 +104,7 @@ public final class TsdbQueryLoader {
      *                                        perform the search.
      * @throws IllegalArgumentException       if bad data was retreived from HBase.
      */
-    public TreeMap<byte[], Span> findSpans(final TsdbQueryDto query) throws HBaseException {
+    public Response findSpans(final TsdbQueryDto query) throws HBaseException {
         final short metric_width = tsdb.metrics.width();
         final TreeMap<byte[], Span> spans =  // The key is a row key from HBase.
                 new TreeMap<byte[], Span>(new SpanCmp(metric_width));
@@ -131,13 +142,12 @@ public final class TsdbQueryLoader {
             throw new RuntimeException("Should never be here", e);
         } finally {
             hbase_time += (System.nanoTime() - starttime) / 1000000;
-            TSDB.scanlatency.add(hbase_time);
         }
         LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
         if (nrows == 0) {
             return null;
         }
-        return spans;
+        return new Response(spans, hbase_time);
     }
 
     /**
